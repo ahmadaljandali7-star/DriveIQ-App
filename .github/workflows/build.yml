@@ -16,15 +16,11 @@ jobs:
         with:
           node-version: '18'
 
-      - name: Kill Yarn completely
+      - name: Clean and use npm only
         run: |
-          rm -rf node_modules package-lock.json yarn.lock .yarn .yarnrc .npmrc
-          sudo npm uninstall -g yarn
-          sudo npm install -g npm@latest
-          npm cache clean --force
-
-      - name: Install dependencies
-        run: npm install --force
+          rm -rf node_modules package-lock.json yarn.lock
+          npm install -g npm@latest
+          npm install
 
       - name: Setup Java
         uses: actions/setup-java@v4
