@@ -11,10 +11,28 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Remove Yarn completely
+        run: |
+          rm -rf ~/.yarn
+          rm -f /usr/local/bin/yarn
+          sudo rm -rf /opt/yarn*
+          brew uninstall --ignore-dependencies yarn 2>/dev/null || true
+          export PATH=$(echo $PATH | tr ':' '\n' | grep -v ".yarn" | tr '\n' ':')
+          echo "PATH=$PATH" >> $GITHUB_ENV
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '18'
+
+      - name: Verify Yarn is gone
+        run: |
+          if command -v yarn &> /dev/null; then
+            echo "❌ YARN STILL EXISTS!"
+            exit 1
+          else
+            echo "✅ Yarn successfully removed"
+          fi
 
       - name: Clean and install
         run: |
