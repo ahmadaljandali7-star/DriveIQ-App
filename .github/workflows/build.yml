@@ -11,12 +11,10 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Kill Yarn from the system
+      - name: Clean everything (no sudo)
         run: |
-          sudo rm -f /usr/local/bin/yarn
-          sudo rm -f /usr/bin/yarn
-          npm uninstall -g yarn
           rm -rf node_modules package-lock.json yarn.lock .yarn .yarnrc .npmrc
+          npm uninstall -g yarn 2>/dev/null || true
           npm install -g npm@10.8.2
 
       - name: Setup Node.js
