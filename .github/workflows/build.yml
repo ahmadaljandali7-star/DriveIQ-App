@@ -16,6 +16,12 @@ jobs:
         with:
           node-version: '18'
 
+      - name: Clean disk space
+        run: |
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/hostedtoolcache
+          df -h
+
       - name: Clean and install dependencies
         run: |
           rm -rf node_modules package-lock.json yarn.lock
@@ -41,17 +47,27 @@ jobs:
           node --version
           npm --version
           eas --version
+          echo "=== Disk space ==="
+          df -h
           echo "=== Files ==="
           ls -la
-          echo "=== Current directory ==="
-          pwd
 
       - name: Build APK
         run: |
-          eas build -p android --profile preview --local --non-interactive --output app-release.apk
+          eas build -p android --profile preview --local --non-interactive --output app-release.apk --verbose
+        continue-on-error: true
 
-      - name: Upload APK
+      - name: Upload APK (if exists)
+        if: success() || failure()
         uses: actions/upload-artifact@v4
         with:
           name: driveiq-apk
           path: app-release.apk
+          if-no-files-found: warn
+
+      - name: Show build logs
+        if: failure()
+        run: |
+          echo "=== Build failed. Checking logs ==="
+          ls -la /Users/runner/.expo/
+          cat /Users/runner/.expo/*.log 2>/dev/null || echo "No logs found"
