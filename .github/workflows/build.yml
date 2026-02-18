@@ -16,10 +16,10 @@ jobs:
         with:
           node-version: '18'
 
-      - name: Clean and use npm only
+      - name: Clean and use stable npm
         run: |
           rm -rf node_modules package-lock.json yarn.lock
-          npm install -g npm@latest
+          npm install -g npm@10.8.2
           npm install
 
       - name: Setup Java
