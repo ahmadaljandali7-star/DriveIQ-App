@@ -11,30 +11,15 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Remove Yarn and use npm
-        run: |
-          sudo rm -f /usr/local/bin/yarn
-          sudo rm -f /usr/bin/yarn
-          sudo apt-get remove -y yarn || true
-          rm -rf node_modules package-lock.json yarn.lock .yarn .yarnrc .npmrc
-          npm cache clean --force
-
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '18'
 
-      - name: Install dependencies
-        run: npm install
-
-      - name: Verify Yarn is gone
+      - name: Clean install
         run: |
-          if command -v yarn &> /dev/null; then
-            echo "YARN STILL EXISTS!"
-            exit 1
-          else
-            echo "Yarn successfully removed"
-          fi
+          rm -rf node_modules package-lock.json
+          npm install
 
       - name: Setup Java
         uses: actions/setup-java@v4
