@@ -11,9 +11,10 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Clean everything
+      - name: Nuke everything
         run: |
           rm -rf node_modules package-lock.json yarn.lock .yarn .yarnrc .npmrc
+          npm cache clean --force
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -21,7 +22,7 @@ jobs:
           node-version: '18'
 
       - name: Install dependencies
-        run: npm install
+        run: npm install --no-cache
 
       - name: Setup Java
         uses: actions/setup-java@v4
