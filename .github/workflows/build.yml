@@ -11,32 +11,14 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Remove Yarn completely
-        run: |
-          rm -rf ~/.yarn
-          rm -f /usr/local/bin/yarn
-          sudo rm -rf /opt/yarn*
-          brew uninstall --ignore-dependencies yarn 2>/dev/null || true
-          export PATH=$(echo $PATH | tr ':' '\n' | grep -v ".yarn" | tr '\n' ':')
-          echo "PATH=$PATH" >> $GITHUB_ENV
-
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '18'
 
-      - name: Verify Yarn is gone
+      - name: Clean and install with npm
         run: |
-          if command -v yarn &> /dev/null; then
-            echo "❌ YARN STILL EXISTS!"
-            exit 1
-          else
-            echo "✅ Yarn successfully removed"
-          fi
-
-      - name: Clean and install
-        run: |
-          rm -rf node_modules package-lock.json
+          rm -rf node_modules package-lock.json yarn.lock
           npm install
 
       - name: Setup Java
@@ -45,11 +27,12 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Setup Expo
+      - name: Setup Expo with npm
         uses: expo/expo-github-action@v8
         with:
           eas-version: latest
           token: ${{ secrets.EXPO_TOKEN }}
+          package-manager: npm
 
       - name: Prebuild
         run: npx expo prebuild --clean
