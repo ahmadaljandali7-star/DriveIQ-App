@@ -16,7 +16,7 @@ jobs:
         with:
           node-version: '18'
 
-      - name: Clean and install with npm
+      - name: Clean and install
         run: |
           rm -rf node_modules package-lock.json yarn.lock
           npm install
@@ -27,12 +27,11 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Setup Expo with npm
+      - name: Setup Expo
         uses: expo/expo-github-action@v8
         with:
           eas-version: latest
           token: ${{ secrets.EXPO_TOKEN }}
-          package-manager: npm
 
       - name: Prebuild
         run: npx expo prebuild --clean
