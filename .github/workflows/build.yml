@@ -54,7 +54,7 @@ jobs:
 
       - name: Build APK
         run: |
-          eas build -p android --profile preview --local --non-interactive --output app-release.apk --verbose
+          eas build -p android --profile preview --local --non-interactive --output app-release.apk
         continue-on-error: true
 
       - name: Upload APK (if exists)
@@ -69,5 +69,5 @@ jobs:
         if: failure()
         run: |
           echo "=== Build failed. Checking logs ==="
-          ls -la /Users/runner/.expo/
+          ls -la /Users/runner/.expo/ || true
           cat /Users/runner/.expo/*.log 2>/dev/null || echo "No logs found"
