@@ -14,7 +14,6 @@ jobs:
       - name: Clean everything
         run: |
           rm -rf node_modules package-lock.json yarn.lock .yarn .yarnrc .npmrc
-          npm install -g npm@10.8.2
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
