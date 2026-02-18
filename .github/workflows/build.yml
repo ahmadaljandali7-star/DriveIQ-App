@@ -18,7 +18,9 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
-        run: npm install
+        run: |
+          rm -f package-lock.json yarn.lock
+          npm install
 
       - name: Setup Java
         uses: actions/setup-java@v4
