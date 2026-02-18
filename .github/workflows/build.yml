@@ -17,10 +17,9 @@ jobs:
           node-version: '18'
           cache: 'npm'
 
-            - name: Install dependencies
+      - name: Install dependencies
         run: |
-          rm -rf node_modules package-lock.json yarn.lock
-          npm cache clean --force
+          rm -f package-lock.json yarn.lock
           npm install
 
       - name: Setup Java
