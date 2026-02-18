@@ -4,6 +4,12 @@ on:
     branches: [ main ]
   workflow_dispatch:
 
+permissions:
+  contents: write
+  actions: read
+  checks: write
+  pull-requests: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -16,12 +22,13 @@ jobs:
         with:
           node-version: '18'
 
-      - name: Kill Yarn and use npm only
+      - name: Clean everything
         run: |
-          rm -rf node_modules package-lock.json yarn.lock .yarn .yarnrc .npmrc
+          rm -rf node_modules package-lock.json yarn.lock
           npm cache clean --force
-          npm install -g npm@latest
-          npm install --force
+
+      - name: Install dependencies
+        run: npm install
 
       - name: Setup Java
         uses: actions/setup-java@v4
@@ -39,8 +46,7 @@ jobs:
         run: npx expo prebuild --clean
 
       - name: Build APK
-        run: |
-          EAS_NO_VCS=1 npx eas build -p android --profile preview --local --non-interactive --output app-release.apk
+        run: npx eas-cli build -p android --profile preview --local --non-interactive --output app-release.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
