@@ -11,16 +11,21 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Kill Yarn from the system
+        run: |
+          sudo rm -f /usr/local/bin/yarn
+          sudo rm -f /usr/bin/yarn
+          npm uninstall -g yarn
+          rm -rf node_modules package-lock.json yarn.lock .yarn .yarnrc .npmrc
+          npm install -g npm@10.8.2
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '18'
 
-      - name: Clean and use stable npm
-        run: |
-          rm -rf node_modules package-lock.json yarn.lock
-          npm install -g npm@10.8.2
-          npm install
+      - name: Install dependencies
+        run: npm install
 
       - name: Setup Java
         uses: actions/setup-java@v4
