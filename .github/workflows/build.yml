@@ -15,13 +15,13 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '18'
-          cache: 'npm'
 
-      - name: Install dependencies
+      - name: Kill Yarn and use npm only
         run: |
-          rm -rf node_modules package-lock.json yarn.lock
+          rm -rf node_modules package-lock.json yarn.lock .yarn .yarnrc .npmrc
           npm cache clean --force
-          npm install --no-package-lock
+          npm install -g npm@latest
+          npm install --force
 
       - name: Setup Java
         uses: actions/setup-java@v4
@@ -40,7 +40,7 @@ jobs:
 
       - name: Build APK
         run: |
-          EAS_NO_VCS=1 eas build -p android --profile preview --local --non-interactive --output app-release.apk
+          EAS_NO_VCS=1 npx eas build -p android --profile preview --local --non-interactive --output app-release.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
