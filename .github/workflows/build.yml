@@ -54,7 +54,7 @@ jobs:
 
       - name: Build APK
         run: |
-          eas build -p android --profile preview --local --non-interactive --output app-release.apk
+          eas build -p android --profile preview --local --non-interactive --output app-release.apk --debug
         continue-on-error: true
 
       - name: Upload APK (if exists)
