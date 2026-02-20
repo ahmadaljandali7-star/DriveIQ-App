@@ -7,13 +7,18 @@ import {
   Alert,
   Platform,
   ActivityIndicator,
+  ToastAndroid,
+  Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
+import * as TaskManager from 'expo-task-manager';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const API_URL = process.env.EXPO_PUBLIC_BACKEND_URL || '';
+const LOCATION_TASK_NAME = 'driveiq-location-tracking';
+const WELCOME_SHOWN_KEY = 'driveiq_welcome_shown';
 
 interface TripData {
   id: string;
@@ -27,6 +32,33 @@ interface TripData {
   speedReadings: number[];
 }
 
+// Global variables to share data with TaskManager
+let globalTripData: TripData | null = null;
+let globalPreviousSpeed = 0;
+let globalPreviousLocation: Location.LocationObject | null = null;
+let onHardBrakeCallback: (() => void) | null = null;
+let onLocationUpdateCallback: ((location: Location.LocationObject) => void) | null = null;
+
+// Define the background location task
+TaskManager.defineTask(LOCATION_TASK_NAME, async ({ data, error }) => {
+  if (error) {
+    console.error('Location task error:', error);
+    return;
+  }
+  
+  if (data) {
+    const { locations } = data as { locations: Location.LocationObject[] };
+    if (locations && locations.length > 0) {
+      const location = locations[0];
+      
+      // Process location update
+      if (globalTripData && onLocationUpdateCallback) {
+        onLocationUpdateCallback(location);
+      }
+    }
+  }
+});
+
 export default function TodayScreen() {
   const [isTracking, setIsTracking] = useState(false);
   const [currentSpeed, setCurrentSpeed] = useState(0);
@@ -35,15 +67,41 @@ export default function TodayScreen() {
   const [deviceId, setDeviceId] = useState<string>('');
   const [isLoading, setIsLoading] = useState(false);
   const [locationPermission, setLocationPermission] = useState(false);
+  const [backgroundPermission, setBackgroundPermission] = useState(false);
   
   const locationSubscription = useRef<Location.LocationSubscription | null>(null);
   const previousSpeed = useRef<number>(0);
   const previousLocation = useRef<Location.LocationObject | null>(null);
 
-  // Initialize device ID
+  // Initialize device ID and show welcome message
   useEffect(() => {
     initializeDevice();
+    showWelcomeMessage();
   }, []);
+
+  // Show welcome message only once
+  const showWelcomeMessage = async () => {
+    try {
+      const welcomeShown = await AsyncStorage.getItem(WELCOME_SHOWN_KEY);
+      if (!welcomeShown) {
+        Alert.alert(
+          'مرحباً بك في DriveIQ! 🚗',
+          'هذا التطبيق يساعدك على تحسين قيادتك. اضغط على "بدء التتبع" قبل الانطلاق.',
+          [{ text: 'فهمت', onPress: () => {} }]
+        );
+        await AsyncStorage.setItem(WELCOME_SHOWN_KEY, 'true');
+      }
+    } catch (error) {
+      console.error('Error showing welcome message:', error);
+    }
+  };
+
+  // Show toast for Android
+  const showToast = (message: string) => {
+    if (Platform.OS === 'android') {
+      ToastAndroid.show(message, ToastAndroid.LONG);
+    }
+  };
 
   const initializeDevice = async () => {
     try {
@@ -54,16 +112,28 @@ export default function TodayScreen() {
       }
       setDeviceId(id);
       
-      // Request location permission
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      setLocationPermission(status === 'granted');
+      // Request foreground location permission
+      const { status: foregroundStatus } = await Location.requestForegroundPermissionsAsync();
+      setLocationPermission(foregroundStatus === 'granted');
       
-      if (status !== 'granted') {
+      if (foregroundStatus !== 'granted') {
         Alert.alert(
-          'Permission Required',
-          'Location permission is required for GPS tracking. Please enable it in settings.',
-          [{ text: 'OK' }]
+          'صلاحية الموقع مطلوبة',
+          'لم يتم تفعيل صلاحية الموقع. الرجاء الذهاب إلى الإعدادات ومنح التطبيق إذن الوصول إلى الموقع.',
+          [
+            { text: 'إلغاء', style: 'cancel' },
+            { text: 'فتح الإعدادات', onPress: () => Linking.openSettings() }
+          ]
         );
+        return;
+      }
+      
+      // Request background location permission for Android
+      if (Platform.OS === 'android') {
+        const { status: backgroundStatus } = await Location.requestBackgroundPermissionsAsync();
+        setBackgroundPermission(backgroundStatus === 'granted');
+      } else {
+        setBackgroundPermission(true);
       }
       
       // Fetch today's score
@@ -99,8 +169,29 @@ export default function TodayScreen() {
   };
 
   const startTracking = async () => {
+    // Check foreground permission
     if (!locationPermission) {
-      Alert.alert('Permission Required', 'Please enable location permission to track your drive.');
+      Alert.alert(
+        'صلاحية الموقع مطلوبة',
+        'لم يتم تفعيل صلاحية الموقع. الرجاء الذهاب إلى الإعدادات ومنح التطبيق إذن الوصول إلى الموقع.',
+        [
+          { text: 'إلغاء', style: 'cancel' },
+          { text: 'فتح الإعدادات', onPress: () => Linking.openSettings() }
+        ]
+      );
+      return;
+    }
+
+    // Check background permission on Android
+    if (Platform.OS === 'android' && !backgroundPermission) {
+      Alert.alert(
+        'صلاحية الموقع في الخلفية مطلوبة',
+        'للتتبع المستمر، يرجى منح صلاحية الموقع "طوال الوقت" من الإعدادات.',
+        [
+          { text: 'إلغاء', style: 'cancel' },
+          { text: 'فتح الإعدادات', onPress: () => Linking.openSettings() }
+        ]
+      );
       return;
     }
 
@@ -135,8 +226,27 @@ export default function TodayScreen() {
         speedReadings: [],
       };
       setCurrentTrip(tripData);
+      globalTripData = tripData;
       
-      // Start location tracking
+      // Set up location update callback
+      onLocationUpdateCallback = (location: Location.LocationObject) => {
+        handleLocationUpdate(location, tripData);
+      };
+
+      // Start background location tracking with foreground service
+      await Location.startLocationUpdatesAsync(LOCATION_TASK_NAME, {
+        accuracy: Location.Accuracy.BestForNavigation,
+        timeInterval: 1000,
+        distanceInterval: 1,
+        showsBackgroundLocationIndicator: true,
+        foregroundService: {
+          notificationTitle: 'DriveIQ',
+          notificationBody: 'يتم تسجيل رحلتك حالياً...',
+          notificationColor: '#0066CC',
+        },
+      });
+
+      // Also start foreground watcher for UI updates
       locationSubscription.current = await Location.watchPositionAsync(
         {
           accuracy: Location.Accuracy.BestForNavigation,
@@ -149,10 +259,23 @@ export default function TodayScreen() {
       setIsTracking(true);
       previousSpeed.current = 0;
       previousLocation.current = null;
+      globalPreviousSpeed = 0;
+      globalPreviousLocation = null;
+
+      // Show success message in Arabic
+      Alert.alert(
+        'انطلاقة آمنة! 🚗',
+        'دعنا نلتقط رحلتك. شد حزام الأمان!',
+        [{ text: 'حسناً', onPress: () => {} }]
+      );
       
     } catch (error) {
       console.error('Error starting tracking:', error);
-      Alert.alert('Error', 'Failed to start tracking. Please try again.');
+      Alert.alert(
+        'خطأ',
+        'فشل بدء التتبع. يرجى المحاولة مرة أخرى.',
+        [{ text: 'حسناً' }]
+      );
     } finally {
       setIsLoading(false);
     }
@@ -175,6 +298,7 @@ export default function TodayScreen() {
       tripData.distance += dist;
     }
     previousLocation.current = location;
+    globalPreviousLocation = location;
     
     // Update max speed
     if (speed > tripData.maxSpeed) {
@@ -188,6 +312,8 @@ export default function TodayScreen() {
     const speedDiff = previousSpeed.current - speed;
     if (speedDiff > 15) {
       tripData.hardBrakes++;
+      // Show toast warning for hard braking in Arabic
+      showToast('⚠️ تنبيه: فرملة مفاجئة! خفف السرعة قليلاً وحاول التوقف بهدوء.');
     }
     
     // Detect hard acceleration (speed increase > 15 km/h per second)
@@ -199,10 +325,13 @@ export default function TodayScreen() {
     // Detect speeding (> 130 km/h)
     if (speed > 130 && previousSpeed.current <= 130) {
       tripData.speedingCount++;
+      showToast('⚠️ تنبيه: تجاوزت السرعة المسموحة! خفف السرعة.');
     }
     
     previousSpeed.current = speed;
+    globalPreviousSpeed = speed;
     setCurrentTrip({ ...tripData });
+    globalTripData = tripData;
   }, []);
 
   const stopTracking = async () => {
@@ -210,11 +339,21 @@ export default function TodayScreen() {
     
     setIsLoading(true);
     try {
-      // Stop location tracking
+      // Stop foreground location tracking
       if (locationSubscription.current) {
         locationSubscription.current.remove();
         locationSubscription.current = null;
       }
+
+      // Stop background location tracking
+      const isTaskRunning = await TaskManager.isTaskRegisteredAsync(LOCATION_TASK_NAME);
+      if (isTaskRunning) {
+        await Location.stopLocationUpdatesAsync(LOCATION_TASK_NAME);
+      }
+
+      // Clear global references
+      globalTripData = null;
+      onLocationUpdateCallback = null;
 
       // Calculate final stats
       const endTime = new Date();
@@ -253,12 +392,22 @@ export default function TodayScreen() {
         throw new Error('Failed to save trip');
       }
 
-      // Show success message
-      Alert.alert(
-        'Trip Saved!',
-        `Your driving score: ${score}\n\nDistance: ${currentTrip.distance.toFixed(2)} km\nDuration: ${durationMinutes.toFixed(1)} min`,
-        [{ text: 'OK' }]
-      );
+      // Show Arabic feedback message based on score
+      let feedbackTitle = '';
+      let feedbackMessage = '';
+      
+      if (score > 80) {
+        feedbackTitle = 'قيادة ممتازة! 🌟';
+        feedbackMessage = `أنت سائق مسؤول. استمر على هذا المنوال!\n\nالنقاط: ${score}\nالمسافة: ${currentTrip.distance.toFixed(2)} كم\nالمدة: ${durationMinutes.toFixed(1)} دقيقة`;
+      } else if (score >= 50) {
+        feedbackTitle = 'قيادة جيدة 👍';
+        feedbackMessage = `ولكن هناك مجال للتحسن. انتبه للفرامل المفاجئة.\n\nالنقاط: ${score}\nالمسافة: ${currentTrip.distance.toFixed(2)} كم\nالمدة: ${durationMinutes.toFixed(1)} دقيقة`;
+      } else {
+        feedbackTitle = 'تنبيه! ⚠️';
+        feedbackMessage = `قيادتك تحتاج إلى تحسين كبير. حاول القيادة بهدوء أكبر والتزم بالسرعة المحددة.\n\nالنقاط: ${score}\nالمسافة: ${currentTrip.distance.toFixed(2)} كم\nالمدة: ${durationMinutes.toFixed(1)} دقيقة`;
+      }
+
+      Alert.alert(feedbackTitle, feedbackMessage, [{ text: 'حسناً' }]);
 
       // Reset state
       setCurrentTrip(null);
@@ -272,7 +421,7 @@ export default function TodayScreen() {
       
     } catch (error) {
       console.error('Error stopping tracking:', error);
-      Alert.alert('Error', 'Failed to save trip. Please try again.');
+      Alert.alert('خطأ', 'فشل حفظ الرحلة. يرجى المحاولة مرة أخرى.');
     } finally {
       setIsLoading(false);
     }
