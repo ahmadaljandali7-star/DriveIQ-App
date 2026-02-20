@@ -29,8 +29,11 @@
         "ACCESS_FINE_LOCATION",
         "ACCESS_BACKGROUND_LOCATION",
         "FOREGROUND_SERVICE",
+        "FOREGROUND_SERVICE_LOCATION",
         "android.permission.ACCESS_COARSE_LOCATION",
-        "android.permission.ACCESS_FINE_LOCATION"
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_LOCATION"
       ],
       "package": "com.ahmad_aljandali90.driveiq"
     },
@@ -53,11 +56,14 @@
       [
         "expo-location",
         {
-          "locationAlwaysAndWhenInUsePermission": "DriveIQ needs location to track your driving trips",
-          "locationAlwaysPermission": "DriveIQ uses your location to track driving even when not in use",
-          "locationWhenInUsePermission": "DriveIQ needs location to track your driving"
+          "locationAlwaysAndWhenInUsePermission": "DriveIQ يحتاج صلاحية الموقع لتتبع رحلات القيادة",
+          "locationAlwaysPermission": "DriveIQ يستخدم موقعك لتتبع القيادة حتى عند عدم استخدام التطبيق",
+          "locationWhenInUsePermission": "DriveIQ يحتاج صلاحية الموقع لتتبع قيادتك",
+          "isAndroidBackgroundLocationEnabled": true,
+          "isAndroidForegroundServiceEnabled": true
         }
-      ]
+      ],
+      "expo-task-manager"
     ],
     "experiments": {
       "typedRoutes": true
