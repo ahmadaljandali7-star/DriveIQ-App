@@ -2,8 +2,10 @@ import React from 'react';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { View, StyleSheet } from 'react-native';
+
 // Import location task to ensure it's registered before any screens load
 import './locationTask';
+
 export default function RootLayout() {
   return (
     <View style={styles.container}>
@@ -38,3 +40,5 @@ const styles = StyleSheet.create({
     backgroundColor: '#0A1628',
   },
 });
+
+
