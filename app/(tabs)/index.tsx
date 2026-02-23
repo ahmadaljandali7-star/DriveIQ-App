@@ -1,4 +1,4 @@
-"import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -73,9 +73,8 @@ export default function TodayScreen() {
   const checkTaskRegistration = async () => {
     try {
       const isRegistered = await TaskManager.isTaskRegisteredAsync(LOCATION_TASK_NAME);
-      log('Init', `Task \"${LOCATION_TASK_NAME}\" registered: ${isRegistered}`);
-      setDebugInfo(prev => prev + `
-Task registered: ${isRegistered}`);
+      log('Init', `Task "${LOCATION_TASK_NAME}" registered: ${isRegistered}`);
+      setDebugInfo(prev => prev + `\nTask registered: ${isRegistered}`);
     } catch (error) {
       log('Init', 'Error checking task registration', error);
     }
@@ -88,7 +87,7 @@ Task registered: ${isRegistered}`);
       if (!welcomeShown) {
         Alert.alert(
           'مرحباً بك في DriveIQ! 🚗',
-          'هذا التطبيق يساعدك على تحسين قيادتك. اضغط على \"بدء التتبع\" قبل الانطلاق.',
+          'هذا التطبيق يساعدك على تحسين قيادتك. اضغط على "بدء التتبع" قبل الانطلاق.',
           [{ text: 'فهمت', onPress: () => {} }]
         );
         await AsyncStorage.setItem(WELCOME_SHOWN_KEY, 'true');
@@ -107,7 +106,7 @@ Task registered: ${isRegistered}`);
 
   const initializeDevice = async () => {
     log('Init', 'Starting device initialization...');
-    log('Init', `API_URL: \"${API_URL}\"`);
+    log('Init', `API_URL: "${API_URL}"`);
     
     try {
       let id = await AsyncStorage.getItem('deviceId');
@@ -209,7 +208,7 @@ Task registered: ${isRegistered}`);
     if (Platform.OS === 'android' && !backgroundPermission) {
       log('Tracking', 'WARNING: No background permission - tracking may stop when app is in background');
       // Show warning but continue
-      showToast('تحذير: التتبع قد يتوقف عند إغلاق التطبيق. يفضل منح صلاحية الموقع \"طوال الوقت\".');
+      showToast('تحذير: التتبع قد يتوقف عند إغلاق التطبيق. يفضل منح صلاحية الموقع "طوال الوقت".');
     }
 
     setIsLoading(true);
@@ -338,9 +337,7 @@ Task registered: ${isRegistered}`);
       log('Tracking', 'Tracking started successfully!');
       Alert.alert(
         'انطلاقة آمنة! 🚗',
-        `دعنا نلتقط رحلتك. شد حزام الأمان!
-
-${isOffline ? '(وضع غير متصل)' : ''}`,
+        `دعنا نلتقط رحلتك. شد حزام الأمان!\n\n${isOffline ? '(وضع غير متصل)' : ''}`,
         [{ text: 'حسناً', onPress: () => {} }]
       );
       
@@ -364,11 +361,7 @@ ${isOffline ? '(وضع غير متصل)' : ''}`,
       
       Alert.alert(
         'خطأ في بدء التتبع',
-        `${error.message}
-
-تأكد من:
-1. تفعيل GPS
-2. منح صلاحية الموقع`,
+        `${error.message}\n\nتأكد من:\n1. تفعيل GPS\n2. منح صلاحية الموقع`,
         [{ text: 'حسناً' }]
       );
     } finally {
@@ -530,25 +523,13 @@ ${isOffline ? '(وضع غير متصل)' : ''}`,
       
       if (score > 80) {
         feedbackTitle = 'قيادة ممتازة! 🌟';
-        feedbackMessage = `أنت سائق مسؤول. استمر على هذا المنوال!
-
-النقاط: ${score}
-المسافة: ${tripData.distance.toFixed(2)} كم
-المدة: ${durationMinutes.toFixed(1)} دقيقة`;
+        feedbackMessage = `أنت سائق مسؤول. استمر على هذا المنوال!\n\nالنقاط: ${score}\nالمسافة: ${tripData.distance.toFixed(2)} كم\nالمدة: ${durationMinutes.toFixed(1)} دقيقة`;
       } else if (score >= 50) {
         feedbackTitle = 'قيادة جيدة 👍';
-        feedbackMessage = `ولكن هناك مجال للتحسن. انتبه للفرامل المفاجئة.
-
-النقاط: ${score}
-المسافة: ${tripData.distance.toFixed(2)} كم
-المدة: ${durationMinutes.toFixed(1)} دقيقة`;
+        feedbackMessage = `ولكن هناك مجال للتحسن. انتبه للفرامل المفاجئة.\n\nالنقاط: ${score}\nالمسافة: ${tripData.distance.toFixed(2)} كم\nالمدة: ${durationMinutes.toFixed(1)} دقيقة`;
       } else {
         feedbackTitle = 'تنبيه! ⚠️';
-        feedbackMessage = `قيادتك تحتاج إلى تحسين كبير. حاول القيادة بهدوء أكبر والتزم بالسرعة المحددة.
-
-النقاط: ${score}
-المسافة: ${tripData.distance.toFixed(2)} كم
-المدة: ${durationMinutes.toFixed(1)} دقيقة`;
+        feedbackMessage = `قيادتك تحتاج إلى تحسين كبير. حاول القيادة بهدوء أكبر والتزم بالسرعة المحددة.\n\nالنقاط: ${score}\nالمسافة: ${tripData.distance.toFixed(2)} كم\nالمدة: ${durationMinutes.toFixed(1)} دقيقة`;
       }
 
       Alert.alert(feedbackTitle, feedbackMessage, [{ text: 'حسناً' }]);
@@ -637,14 +618,14 @@ ${isOffline ? '(وضع غير متصل)' : ''}`,
             {todayScore !== null ? todayScore : '--'}
           </Text>
           <Text style={styles.scoreSubtext}>
-            {todayScore !== null ? 'Based on today's trips' : 'No trips recorded today'}
+            {todayScore !== null ? 'Based on today\'s trips' : 'No trips recorded today'}
           </Text>
         </View>
 
         {/* Speed Display */}
         <View style={styles.speedCard}>
           <View style={styles.speedIconContainer}>
-            <Ionicons name=\"speedometer\" size={32} color=\"#0066CC\" />
+            <Ionicons name="speedometer" size={32} color="#0066CC" />
           </View>
           <View style={styles.speedInfo}>
             <Text style={styles.speedValue}>{currentSpeed}</Text>
@@ -659,19 +640,19 @@ ${isOffline ? '(وضع غير متصل)' : ''}`,
         {isTracking && currentTrip && (
           <View style={styles.tripStats}>
             <View style={styles.statItem}>
-              <Ionicons name=\"navigate\" size={20} color=\"#0066CC\" />
+              <Ionicons name="navigate" size={20} color="#0066CC" />
               <Text style={styles.statValue}>{currentTrip.distance.toFixed(2)}</Text>
               <Text style={styles.statLabel}>km</Text>
             </View>
             <View style={styles.statDivider} />
             <View style={styles.statItem}>
-              <Ionicons name=\"flash\" size={20} color=\"#F59E0B\" />
+              <Ionicons name="flash" size={20} color="#F59E0B" />
               <Text style={styles.statValue}>{currentTrip.maxSpeed}</Text>
               <Text style={styles.statLabel}>max km/h</Text>
             </View>
             <View style={styles.statDivider} />
             <View style={styles.statItem}>
-              <Ionicons name=\"warning\" size={20} color=\"#EF4444\" />
+              <Ionicons name="warning" size={20} color="#EF4444" />
               <Text style={styles.statValue}>{currentTrip.hardBrakes + currentTrip.hardAccelerations}</Text>
               <Text style={styles.statLabel}>events</Text>
             </View>
@@ -701,10 +682,10 @@ ${isOffline ? '(وضع غير متصل)' : ''}`,
               activeOpacity={0.8}
             >
               {isLoading ? (
-                <ActivityIndicator color=\"#FFFFFF\" size=\"small\" />
+                <ActivityIndicator color="#FFFFFF" size="small" />
               ) : (
                 <>
-                  <Ionicons name=\"play\" size={24} color=\"#FFFFFF\" />
+                  <Ionicons name="play" size={24} color="#FFFFFF" />
                   <Text style={styles.buttonText}>Start Tracking</Text>
                 </>
               )}
@@ -717,10 +698,10 @@ ${isOffline ? '(وضع غير متصل)' : ''}`,
               activeOpacity={0.8}
             >
               {isLoading ? (
-                <ActivityIndicator color=\"#FFFFFF\" size=\"small\" />
+                <ActivityIndicator color="#FFFFFF" size="small" />
               ) : (
                 <>
-                  <Ionicons name=\"stop\" size={24} color=\"#FFFFFF\" />
+                  <Ionicons name="stop" size={24} color="#FFFFFF" />
                   <Text style={styles.buttonText}>Stop Tracking</Text>
                 </>
               )}
@@ -894,4 +875,3 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
 });
-"
