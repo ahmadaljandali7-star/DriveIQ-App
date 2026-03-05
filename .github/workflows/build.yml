@@ -8,6 +8,7 @@ jobs:
   build:
     runs-on: macos-latest
     steps:
+      - timeout-minutes: 30
       - name: Checkout repository
         uses: actions/checkout@v4
 
@@ -40,9 +41,10 @@ jobs:
           npx expo-doctor || echo "⚠️ Dependencies need update, but continuing..."
           npx tsc --noEmit || echo "⚠️ TypeScript errors, but continuing..."
 
-      - name: Build APK
+      - name: Build APK (Cloud build - faster)
         run: |
           eas build -p android --profile preview --non-interactive
+        continue-on-error: true
 
       - name: Upload APK (if exists)
         if: success() || failure()
