@@ -18,16 +18,16 @@ export default function RootLayout() {
         }}
       >
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen 
-          name="trip/[id]" 
-          options={{ 
+        <Stack.Screen
+          name="trip/[id]"
+          options={{
             headerShown: true,
             headerTitle: 'Trip Details',
             headerStyle: { backgroundColor: '#0A1628' },
             headerTintColor: '#FFFFFF',
             headerBackTitle: 'Back',
             animation: 'slide_from_right',
-          }} 
+          }}
         />
       </Stack>
     </View>
@@ -40,5 +40,3 @@ const styles = StyleSheet.create({
     backgroundColor: '#0A1628',
   },
 });
-
-
