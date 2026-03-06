@@ -188,11 +188,14 @@ export default function TodayScreen() {
   };
 
   const startTracking = async () => {
-    log('Tracking', '========== START TRACKING ==========');
+    // ========== DIAGNOSTIC LOGS ==========
+    console.log('[TRACKING] 1. ========== START TRACKING ==========');
+    console.log('[TRACKING] 2. StartTracking function entered');
+    // ======================================
     
     // Check foreground permission
     if (!locationPermission) {
-      log('Tracking', 'ERROR: No foreground permission');
+      console.log('[TRACKING] 3. FAILED: No foreground permission');
       Alert.alert(
         'صلاحية الموقع مطلوبة',
         'لم يتم تفعيل صلاحية الموقع. الرجاء الذهاب إلى الإعدادات ومنح التطبيق إذن الوصول إلى الموقع.',
@@ -203,27 +206,33 @@ export default function TodayScreen() {
       );
       return;
     }
+    console.log('[TRACKING] 4. Foreground permission OK');
 
     // Check background permission on Android (warn but don't block)
     if (Platform.OS === 'android' && !backgroundPermission) {
-      log('Tracking', 'WARNING: No background permission - tracking may stop when app is in background');
-      // Show warning but continue
+      console.log('[TRACKING] 5. WARNING: No background permission');
       showToast('تحذير: التتبع قد يتوقف عند إغلاق التطبيق. يفضل منح صلاحية الموقع "طوال الوقت".');
+    } else {
+      console.log('[TRACKING] 6. Background permission OK');
     }
 
     setIsLoading(true);
-    
+    console.log('[TRACKING] 7. isLoading set to true');
+
     try {
+      console.log('[TRACKING] 8. Inside try block');
+
       // Generate a local trip ID
       const localTripId = 'trip_' + Date.now() + '_' + Math.random().toString(36).substring(2, 9);
-      log('Tracking', `Generated local trip ID: ${localTripId}`);
-      
+      console.log('[TRACKING] 9. Local trip ID generated:', localTripId);
+
       // Try to create trip in backend (but don't fail if backend is unavailable)
       let tripId = localTripId;
       let isOffline = true;
-      
+      console.log('[TRACKING] 10. Default offline mode set');
+
       if (API_URL) {
-        log('Tracking', `Attempting to create trip in backend: ${API_URL}/api/trips`);
+        console.log('[TRACKING] 11. API_URL exists, attempting backend call...');
         try {
           const response = await fetch(`${API_URL}/api/trips`, {
             method: 'POST',
@@ -234,25 +243,26 @@ export default function TodayScreen() {
             }),
           });
 
-          log('Tracking', `Backend response status: ${response.status}`);
+          console.log('[TRACKING] 12. Backend response status:', response.status);
 
           if (response.ok) {
             const trip = await response.json();
             tripId = trip.id;
             isOffline = false;
-            log('Tracking', `Backend trip created: ${tripId}`);
+            console.log('[TRACKING] 13. Backend trip created:', tripId);
           } else {
             const errorText = await response.text();
-            log('Tracking', `Backend error: ${errorText}`);
+            console.log('[TRACKING] 14. Backend error:', errorText);
           }
         } catch (apiError) {
-          log('Tracking', 'Backend unavailable, using offline mode', apiError);
+          console.log('[TRACKING] 15. Backend call FAILED, using offline mode', apiError);
         }
       } else {
-        log('Tracking', 'No API_URL configured, using offline mode');
+        console.log('[TRACKING] 16. No API_URL, using offline mode');
       }
-      
+
       // Initialize trip data
+      console.log('[TRACKING] 17. Initializing trip data...');
       const tripData: TripData = {
         id: tripId,
         startTime: new Date(),
@@ -268,27 +278,28 @@ export default function TodayScreen() {
       
       setCurrentTrip(tripData);
       tripDataRef.current = tripData;
-      log('Tracking', 'Trip data initialized', { tripId, isOffline });
+      console.log('[TRACKING] 18. Trip data initialized and set', { tripId, isOffline });
 
       // Start location tracking
-      log('Tracking', 'Starting location updates...');
-      
+      console.log('[TRACKING] 19. Starting location updates...');
+
       // First, try to start background location tracking with foreground service
       let backgroundStarted = false;
-      
+      console.log('[TRACKING] 20. Attempting background location...');
+
       if (Platform.OS === 'android') {
         try {
           // Check if task is already running
           const isTaskRunning = await TaskManager.isTaskRegisteredAsync(LOCATION_TASK_NAME);
-          log('Tracking', `Task already running: ${isTaskRunning}`);
-          
+          console.log('[TRACKING] 21. Task already running:', isTaskRunning);
+
           if (isTaskRunning) {
             // Stop existing task first
-            log('Tracking', 'Stopping existing task...');
+            console.log('[TRACKING] 22. Stopping existing task...');
             await Location.stopLocationUpdatesAsync(LOCATION_TASK_NAME);
           }
-          
-          log('Tracking', 'Starting background location with foreground service...');
+
+          console.log('[TRACKING] 23. Starting background location with foreground service...');
           await Location.startLocationUpdatesAsync(LOCATION_TASK_NAME, {
             accuracy: Location.Accuracy.BestForNavigation,
             timeInterval: 1000,
@@ -300,17 +311,19 @@ export default function TodayScreen() {
               notificationColor: '#0066CC',
             },
           });
-          
+
           backgroundStarted = true;
-          log('Tracking', 'Background location started successfully!');
+          console.log('[TRACKING] 24. Background location started successfully!');
         } catch (bgError: any) {
-          log('Tracking', `Background location failed: ${bgError.message}`, bgError);
+          console.log('[TRACKING] 25. Background location FAILED:', bgError.message);
           showToast('تحذير: لا يمكن تشغيل التتبع في الخلفية');
         }
+      } else {
+        console.log('[TRACKING] 26. Not Android, skipping background task');
       }
 
       // Always start foreground watcher for UI updates
-      log('Tracking', 'Starting foreground location watcher...');
+      console.log('[TRACKING] 27. Attempting foreground watcher...');
       try {
         locationSubscription.current = await Location.watchPositionAsync(
           {
@@ -322,50 +335,52 @@ export default function TodayScreen() {
             handleLocationUpdate(location);
           }
         );
-        log('Tracking', 'Foreground watcher started successfully!');
+        console.log('[TRACKING] 28. Foreground watcher started successfully!');
       } catch (fgError: any) {
-        log('Tracking', `Foreground watcher failed: ${fgError.message}`, fgError);
+        console.log('[TRACKING] 29. Foreground watcher FAILED:', fgError.message);
         throw new Error(`فشل بدء تتبع الموقع: ${fgError.message}`);
       }
 
       // Update state
       setIsTracking(true);
-      previousSpeed.current = 0;
-      previousLocation.current = null;
+      console.log('[TRACKING] 30. isTracking set to true');
 
       // Show success message in Arabic
-      log('Tracking', 'Tracking started successfully!');
+      console.log('[TRACKING] 31. SUCCESS: Tracking started!');
       Alert.alert(
         'انطلاقة آمنة! 🚗',
         `دعنا نلتقط رحلتك. شد حزام الأمان!\n\n${isOffline ? '(وضع غير متصل)' : ''}`,
         [{ text: 'حسناً', onPress: () => {} }]
       );
-      
+
     } catch (error: any) {
-      log('Tracking', `ERROR starting tracking: ${error.message}`, error);
-      
+      console.log('[TRACKING] 32. ERROR: Entered catch block');
+      console.log('[TRACKING] 33. Error details:', error.message);
+
       // Clean up any partial state
       if (locationSubscription.current) {
         locationSubscription.current.remove();
         locationSubscription.current = null;
       }
-      
+
       try {
         const isTaskRunning = await TaskManager.isTaskRegisteredAsync(LOCATION_TASK_NAME);
         if (isTaskRunning) {
           await Location.stopLocationUpdatesAsync(LOCATION_TASK_NAME);
         }
       } catch (cleanupError) {
-        log('Tracking', 'Cleanup error', cleanupError);
+        console.log('[TRACKING] 34. Cleanup error', cleanupError);
       }
-      
+
       Alert.alert(
         'خطأ في بدء التتبع',
         `${error.message}\n\nتأكد من:\n1. تفعيل GPS\n2. منح صلاحية الموقع`,
         [{ text: 'حسناً' }]
       );
     } finally {
+      console.log('[TRACKING] 35. Entered finally block');
       setIsLoading(false);
+      console.log('[TRACKING] 36. isLoading set to false');
     }
   };
 
