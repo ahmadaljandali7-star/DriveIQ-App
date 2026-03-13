@@ -1,63 +1,33 @@
+// This file only exports the task name and helper functions
+// The actual task definition is in /index.js (entry point)
+
 import * as TaskManager from 'expo-task-manager';
-import * as Location from 'expo-location';
 
 export const LOCATION_TASK_NAME = 'driveiq-location-tracking';
 
-// This interface must match the one in index.tsx
-interface LocationTaskData {
-  locations: Location.LocationObject[];
-}
-
-// Define the task ONCE at module level
-TaskManager.defineTask(LOCATION_TASK_NAME, async ({ data, error }) => {
-  console.log(`[LocationTask] ========== TASK EXECUTED at ${new Date().toISOString()} ==========`);
-  
-  if (error) {
-    console.error('[LocationTask] ❌ Error:', error.message);
-    return;
-  }
-
-  if (data) {
-    const { locations } = data as LocationTaskData;
-    console.log(`[LocationTask] ✅ Received ${locations?.length || 0} locations`);
-    
-    if (locations && locations.length > 0) {
-      const lastLocation = locations[locations.length - 1];
-      console.log(`[LocationTask] Last location - lat: ${lastLocation.coords.latitude}, lng: ${lastLocation.coords.longitude}, speed: ${lastLocation.coords.speed}`);
-    }
-  } else {
-    console.log('[LocationTask] ⚠️ No data received');
-  }
-});
-
-console.log('[LocationTask] ✅ Task defined successfully at module level');
-
-// Helper function to check task status
-export async function checkTaskStatus() {
+// Helper function to check if task is properly set up
+export async function checkTaskStatus(): Promise<{ isDefined: boolean; isRegistered: boolean }> {
   try {
-    const isRegistered = await TaskManager.isTaskRegisteredAsync(LOCATION_TASK_NAME);
-    console.log(`[LocationTask] 📊 Task registered: ${isRegistered}`);
-    
     const isDefined = TaskManager.isTaskDefined(LOCATION_TASK_NAME);
-    console.log(`[LocationTask] 📊 Task defined: ${isDefined}`);
+    const isRegistered = await TaskManager.isTaskRegisteredAsync(LOCATION_TASK_NAME);
     
-    return { isRegistered, isDefined };
+    console.log(`[TaskHelper] Task "${LOCATION_TASK_NAME}" - Defined: ${isDefined}, Registered: ${isRegistered}`);
+    
+    return { isDefined, isRegistered };
   } catch (error) {
-    console.error('[LocationTask] ❌ Error checking task status:', error);
-    return { isRegistered: false, isDefined: false };
+    console.error('[TaskHelper] Error checking task status:', error);
+    return { isDefined: false, isRegistered: false };
   }
 }
 
-// Function to ensure task is ready
-export async function ensureTaskReady() {
-  console.log('[LocationTask] 🔍 Ensuring task is ready...');
-  const { isRegistered, isDefined } = await checkTaskStatus();
+// Ensure task is ready before starting tracking
+export async function ensureTaskReady(): Promise<boolean> {
+  const { isDefined } = await checkTaskStatus();
   
   if (!isDefined) {
-    console.error('[LocationTask] ❌ CRITICAL: Task not defined!');
+    console.error('[TaskHelper] CRITICAL: Background task not defined! Check index.js');
     return false;
   }
   
-  console.log('[LocationTask] ✅ Task is ready');
   return true;
 }

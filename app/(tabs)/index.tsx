@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
   ToastAndroid,
   Linking,
+  ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -16,8 +17,8 @@ import * as Location from 'expo-location';
 import * as TaskManager from 'expo-task-manager';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// Import the task definition - MUST be imported to register the task
-import { LOCATION_TASK_NAME } from '../locationTask';
+// Import task name from helper (task is defined in /index.js)
+import { LOCATION_TASK_NAME, checkTaskStatus } from '../locationTask';
 
 const API_URL = process.env.EXPO_PUBLIC_BACKEND_URL || '';
 const WELCOME_SHOWN_KEY = 'driveiq_welcome_shown';
@@ -40,9 +41,16 @@ interface TripData {
 const log = (tag: string, message: string, data?: any) => {
   const timestamp = new Date().toISOString().split('T')[1].split('.')[0];
   if (data) {
-    console.log(`[${timestamp}][${tag}] ${message}`, data);
+    console.log(`[${timestamp}][${tag}] ${message}`, JSON.stringify(data));
   } else {
     console.log(`[${timestamp}][${tag}] ${message}`);
+  }
+};
+
+// Show toast for Android
+const showToast = (message: string) => {
+  if (Platform.OS === 'android') {
+    ToastAndroid.show(message, ToastAndroid.LONG);
   }
 };
 
@@ -51,80 +59,73 @@ export default function TodayScreen() {
   const [currentSpeed, setCurrentSpeed] = useState(0);
   const [currentTrip, setCurrentTrip] = useState<TripData | null>(null);
   const [todayScore, setTodayScore] = useState<number | null>(null);
-  const [deviceId, setDeviceId] = useState<string>('');
+  const [deviceId, setDeviceId] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [locationPermission, setLocationPermission] = useState(false);
   const [backgroundPermission, setBackgroundPermission] = useState(false);
-  const [debugInfo, setDebugInfo] = useState<string>('');
-  
+  const [taskReady, setTaskReady] = useState(false);
+
   const locationSubscription = useRef<Location.LocationSubscription | null>(null);
-  const previousSpeed = useRef<number>(0);
+  const previousSpeed = useRef(0);
   const previousLocation = useRef<Location.LocationObject | null>(null);
   const tripDataRef = useRef<TripData | null>(null);
 
-  // Initialize device ID and show welcome message
+  // Initialize on mount
   useEffect(() => {
-    initializeDevice();
-    showWelcomeMessage();
-    checkTaskRegistration();
+    initializeApp();
   }, []);
 
-  // Check if task is registered
-  const checkTaskRegistration = async () => {
-    try {
-      const isRegistered = await TaskManager.isTaskRegisteredAsync(LOCATION_TASK_NAME);
-      log('Init', `Task "${LOCATION_TASK_NAME}" registered: ${isRegistered}`);
-      setDebugInfo(prev => prev + `\nTask registered: ${isRegistered}`);
-    } catch (error) {
-      log('Init', 'Error checking task registration', error);
+  const initializeApp = async () => {
+    log('Init', 'Starting app initialization...');
+    
+    // 1. Check if background task is defined
+    const status = await checkTaskStatus();
+    setTaskReady(status.isDefined);
+    
+    if (!status.isDefined) {
+      log('Init', 'WARNING: Background task not defined!');
     }
+
+    // 2. Initialize device ID
+    await initializeDevice();
+    
+    // 3. Show welcome message
+    await showWelcomeMessage();
   };
 
-  // Show welcome message only once
   const showWelcomeMessage = async () => {
     try {
       const welcomeShown = await AsyncStorage.getItem(WELCOME_SHOWN_KEY);
       if (!welcomeShown) {
         Alert.alert(
           'مرحباً بك في DriveIQ! 🚗',
-          'هذا التطبيق يساعدك على تحسين قيادتك. اضغط على "بدء التتبع" قبل الانطلاق.',
+          'هذا التطبيق يساعدك على تحسين قيادتك.\n\nاضغط على "بدء التتبع" قبل الانطلاق.',
           [{ text: 'فهمت', onPress: () => {} }]
         );
         await AsyncStorage.setItem(WELCOME_SHOWN_KEY, 'true');
       }
     } catch (error) {
-      log('Welcome', 'Error showing welcome message', error);
-    }
-  };
-
-  // Show toast for Android
-  const showToast = (message: string) => {
-    if (Platform.OS === 'android') {
-      ToastAndroid.show(message, ToastAndroid.LONG);
+      log('Welcome', 'Error showing welcome message');
     }
   };
 
   const initializeDevice = async () => {
-    log('Init', 'Starting device initialization...');
-    log('Init', `API_URL: "${API_URL}"`);
-    
     try {
+      // Get or create device ID
       let id = await AsyncStorage.getItem('deviceId');
       if (!id) {
         id = 'device_' + Math.random().toString(36).substring(2, 15);
         await AsyncStorage.setItem('deviceId', id);
-        log('Init', 'Created new device ID:', id);
-      } else {
-        log('Init', 'Loaded existing device ID:', id);
+        log('Init', 'Created new device ID: ' + id);
       }
       setDeviceId(id);
-      
+
       // Request foreground location permission
       log('Permissions', 'Requesting foreground permission...');
       const { status: foregroundStatus } = await Location.requestForegroundPermissionsAsync();
-      log('Permissions', `Foreground permission: ${foregroundStatus}`);
+      log('Permissions', 'Foreground permission: ' + foregroundStatus);
       setLocationPermission(foregroundStatus === 'granted');
-      
+
       if (foregroundStatus !== 'granted') {
         Alert.alert(
           'صلاحية الموقع مطلوبة',
@@ -136,87 +137,63 @@ export default function TodayScreen() {
         );
         return;
       }
-      
+
       // Request background location permission for Android
       if (Platform.OS === 'android') {
         log('Permissions', 'Requesting background permission...');
         const { status: backgroundStatus } = await Location.requestBackgroundPermissionsAsync();
-        log('Permissions', `Background permission: ${backgroundStatus}`);
+        log('Permissions', 'Background permission: ' + backgroundStatus);
         setBackgroundPermission(backgroundStatus === 'granted');
-        setDebugInfo(`FG: ${foregroundStatus}, BG: ${backgroundStatus}`);
+        
+        if (backgroundStatus !== 'granted') {
+          showToast('للحصول على تتبع مستمر، اختر "طوال الوقت" في إعدادات الموقع');
+        }
       } else {
         setBackgroundPermission(true);
       }
-      
-      // Fetch today's score (only if API is available)
+
+      // Fetch today's score if API is available
       if (API_URL) {
         fetchTodayScore(id);
       }
     } catch (error) {
-      log('Init', 'Error initializing device', error);
+      log('Init', 'Error initializing device');
     }
   };
 
   const fetchTodayScore = async (id: string) => {
-    if (!API_URL) {
-      log('Score', 'Skipping score fetch - no API URL');
-      return;
-    }
-    
+    if (!API_URL) return;
+
     try {
-      log('Score', `Fetching score for device: ${id}`);
       const response = await fetch(`${API_URL}/api/trips/device/${id}`);
       if (response.ok) {
         const trips = await response.json();
         const today = new Date();
         today.setHours(0, 0, 0, 0);
+        
         const todayTrips = trips.filter((trip: any) => {
           const tripDate = new Date(trip.start_time);
           return tripDate >= today;
         });
-        
+
         if (todayTrips.length > 0) {
           const avgScore = todayTrips.reduce((sum: number, t: any) => sum + t.score, 0) / todayTrips.length;
           setTodayScore(Math.round(avgScore));
-        } else {
-          setTodayScore(null);
         }
       }
     } catch (error) {
-      log('Score', 'Error fetching today score', error);
+      log('Score', 'Error fetching today score');
     }
   };
 
   const startTracking = async () => {
-    // ========== DIAGNOSTIC LOGS ==========
-    console.log('[TRACKING] 1. ========== START TRACKING ==========');
-    console.log('[TRACKING] 2. StartTracking function entered');
-    
-    // Check task status first
-    console.log('[TRACKING] 🔍 Checking task status...');
-    try {
-      const isTaskDefined = TaskManager.isTaskDefined(LOCATION_TASK_NAME);
-      console.log(`[TRACKING] 📊 Task defined: ${isTaskDefined}`);
-      
-      const isTaskRegistered = await TaskManager.isTaskRegisteredAsync(LOCATION_TASK_NAME);
-      console.log(`[TRACKING] 📊 Task registered: ${isTaskRegistered}`);
-      
-      if (!isTaskDefined) {
-        console.error('[TRACKING] ❌ CRITICAL: Task not defined!');
-        Alert.alert('خطأ', 'لم يتم تهيئة نظام التتبع بشكل صحيح. أعد تشغيل التطبيق.');
-        return;
-      }
-    } catch (taskError) {
-      console.error('[TRACKING] ❌ Error checking task:', taskError);
-    }
-    // ======================================
+    log('Tracking', '========== START TRACKING ==========');
 
-    // Check foreground permission
+    // Verify permissions
     if (!locationPermission) {
-      console.log('[TRACKING] 3. FAILED: No foreground permission');
       Alert.alert(
         'صلاحية الموقع مطلوبة',
-        'لم يتم تفعيل صلاحية الموقع. الرجاء الذهاب إلى الإعدادات ومنح التطبيق إذن الوصول إلى الموقع.',
+        'لم يتم تفعيل صلاحية الموقع.',
         [
           { text: 'إلغاء', style: 'cancel' },
           { text: 'فتح الإعدادات', onPress: () => Linking.openSettings() }
@@ -224,33 +201,33 @@ export default function TodayScreen() {
       );
       return;
     }
-    console.log('[TRACKING] 4. Foreground permission OK');
 
-    // Check background permission on Android (warn but don't block)
+    // Verify background task is defined
+    const status = await checkTaskStatus();
+    if (!status.isDefined) {
+      log('Tracking', 'CRITICAL: Background task not defined!');
+      Alert.alert(
+        'خطأ في النظام',
+        'نظام التتبع غير جاهز. أعد تشغيل التطبيق.',
+        [{ text: 'حسناً' }]
+      );
+      return;
+    }
+
+    // Warn about background permission (but don't block)
     if (Platform.OS === 'android' && !backgroundPermission) {
-      console.log('[TRACKING] 5. WARNING: No background permission');
-      showToast('تحذير: التتبع قد يتوقف عند إغلاق التطبيق. يفضل منح صلاحية الموقع "طوال الوقت".');
-    } else {
-      console.log('[TRACKING] 6. Background permission OK');
+      showToast('تحذير: التتبع قد يتوقف عند إغلاق التطبيق');
     }
 
     setIsLoading(true);
-    console.log('[TRACKING] 7. isLoading set to true');
 
     try {
-      console.log('[TRACKING] 8. Inside try block');
-
-      // Generate a local trip ID
-      const localTripId = 'trip_' + Date.now() + '_' + Math.random().toString(36).substring(2, 9);
-      console.log('[TRACKING] 9. Local trip ID generated:', localTripId);
-
-      // Try to create trip in backend (but don't fail if backend is unavailable)
-      let tripId = localTripId;
+      // Generate trip ID
+      const tripId = 'trip_' + Date.now() + '_' + Math.random().toString(36).substring(2, 9);
       let isOffline = true;
-      console.log('[TRACKING] 10. Default offline mode set');
 
+      // Try to create trip in backend
       if (API_URL) {
-        console.log('[TRACKING] 11. API_URL exists, attempting backend call...');
         try {
           const response = await fetch(`${API_URL}/api/trips`, {
             method: 'POST',
@@ -261,26 +238,17 @@ export default function TodayScreen() {
             }),
           });
 
-          console.log('[TRACKING] 12. Backend response status:', response.status);
-
           if (response.ok) {
             const trip = await response.json();
-            tripId = trip.id;
             isOffline = false;
-            console.log('[TRACKING] 13. Backend trip created:', tripId);
-          } else {
-            const errorText = await response.text();
-            console.log('[TRACKING] 14. Backend error:', errorText);
+            log('Tracking', 'Trip created on server: ' + trip.id);
           }
         } catch (apiError) {
-          console.log('[TRACKING] 15. Backend call FAILED, using offline mode', apiError);
+          log('Tracking', 'Backend unavailable, using offline mode');
         }
-      } else {
-        console.log('[TRACKING] 16. No API_URL, using offline mode');
       }
 
       // Initialize trip data
-      console.log('[TRACKING] 17. Initializing trip data...');
       const tripData: TripData = {
         id: tripId,
         startTime: new Date(),
@@ -291,103 +259,81 @@ export default function TodayScreen() {
         hardAccelerations: 0,
         speedingCount: 0,
         speedReadings: [],
-        isOffline: isOffline,
+        isOffline,
       };
-      
+
       setCurrentTrip(tripData);
       tripDataRef.current = tripData;
-      console.log('[TRACKING] 18. Trip data initialized and set', { tripId, isOffline });
 
-      // Start location tracking
-      console.log('[TRACKING] 19. Starting location updates...');
+      // Stop any existing background task
+      try {
+        const isRunning = await TaskManager.isTaskRegisteredAsync(LOCATION_TASK_NAME);
+        if (isRunning) {
+          log('Tracking', 'Stopping existing background task...');
+          await Location.stopLocationUpdatesAsync(LOCATION_TASK_NAME);
+        }
+      } catch (e) {
+        // Ignore
+      }
 
-      // First, try to start background location tracking with foreground service
-      let backgroundStarted = false;
-      console.log('[TRACKING] 20. Attempting background location...');
-
+      // Start background location tracking with foreground service
       if (Platform.OS === 'android') {
         try {
-          // Check if task is already running
-          const isTaskRunning = await TaskManager.isTaskRegisteredAsync(LOCATION_TASK_NAME);
-          console.log('[TRACKING] 21. Task already running:', isTaskRunning);
-
-          if (isTaskRunning) {
-            // Stop existing task first
-            console.log('[TRACKING] 22. Stopping existing task...');
-            await Location.stopLocationUpdatesAsync(LOCATION_TASK_NAME);
-          }
-
-          console.log('[TRACKING] 23. Starting background location with foreground service...');
+          log('Tracking', 'Starting background location with foreground service...');
+          
           await Location.startLocationUpdatesAsync(LOCATION_TASK_NAME, {
             accuracy: Location.Accuracy.BestForNavigation,
-            timeInterval: 1000,
-            distanceInterval: 1,
+            timeInterval: 2000,
+            distanceInterval: 5,
             showsBackgroundLocationIndicator: true,
             foregroundService: {
-              notificationTitle: 'DriveIQ',
-              notificationBody: 'يتم تسجيل رحلتك حالياً...',
+              notificationTitle: 'DriveIQ - تتبع القيادة',
+              notificationBody: 'جاري تسجيل رحلتك...',
               notificationColor: '#0066CC',
             },
+            pausesUpdatesAutomatically: false,
+            activityType: Location.ActivityType.AutomotiveNavigation,
           });
-
-          backgroundStarted = true;
-          console.log('[TRACKING] 24. ✅ Background location started successfully!');
+          
+          log('Tracking', '✅ Background location started successfully');
         } catch (bgError: any) {
-          console.log('[TRACKING] 25. ❌ Background location FAILED:', bgError.message);
-          showToast('تحذير: لا يمكن تشغيل التتبع في الخلفية');
+          log('Tracking', '⚠️ Background location failed: ' + bgError.message);
+          // Continue with foreground-only tracking
         }
-      } else {
-        console.log('[TRACKING] 26. Not Android, skipping background task');
       }
 
-      // Always start foreground watcher for UI updates
-      console.log('[TRACKING] 27. Attempting foreground watcher...');
-      try {
-        locationSubscription.current = await Location.watchPositionAsync(
-          {
-            accuracy: Location.Accuracy.BestForNavigation,
-            timeInterval: 1000,
-            distanceInterval: 1,
-          },
-          (location) => {
-            handleLocationUpdate(location);
-          }
-        );
-        console.log('[TRACKING] 28. ✅ Foreground watcher started successfully!');
-      } catch (fgError: any) {
-        console.log('[TRACKING] 29. ❌ Foreground watcher FAILED:', fgError.message);
-        throw new Error(`فشل بدء تتبع الموقع: ${fgError.message}`);
-      }
+      // Start foreground watcher for UI updates
+      log('Tracking', 'Starting foreground location watcher...');
+      locationSubscription.current = await Location.watchPositionAsync(
+        {
+          accuracy: Location.Accuracy.BestForNavigation,
+          timeInterval: 1000,
+          distanceInterval: 1,
+        },
+        (location) => {
+          handleLocationUpdate(location);
+        }
+      );
+      
+      log('Tracking', '✅ Foreground watcher started');
 
       // Update state
       setIsTracking(true);
-      console.log('[TRACKING] 30. isTracking set to true');
 
-      // Show success message in Arabic
-      console.log('[TRACKING] 31. ✅ SUCCESS: Tracking started!');
+      // Success message
       Alert.alert(
         'انطلاقة آمنة! 🚗',
-        `دعنا نلتقط رحلتك. شد حزام الأمان!\n\n${isOffline ? '(وضع غير متصل)' : ''}`,
-        [{ text: 'حسناً', onPress: () => {} }]
+        `دعنا نلتقط رحلتك. شد حزام الأمان!${isOffline ? '\n\n(وضع غير متصل)' : ''}`,
+        [{ text: 'حسناً' }]
       );
 
     } catch (error: any) {
-      console.log('[TRACKING] 32. ❌ ERROR: Entered catch block');
-      console.log('[TRACKING] 33. Error details:', error.message);
-
-      // Clean up any partial state
+      log('Tracking', '❌ Error: ' + error.message);
+      
+      // Cleanup
       if (locationSubscription.current) {
         locationSubscription.current.remove();
         locationSubscription.current = null;
-      }
-
-      try {
-        const isTaskRunning = await TaskManager.isTaskRegisteredAsync(LOCATION_TASK_NAME);
-        if (isTaskRunning) {
-          await Location.stopLocationUpdatesAsync(LOCATION_TASK_NAME);
-        }
-      } catch (cleanupError) {
-        console.log('[TRACKING] 34. Cleanup error', cleanupError);
       }
 
       Alert.alert(
@@ -396,24 +342,19 @@ export default function TodayScreen() {
         [{ text: 'حسناً' }]
       );
     } finally {
-      console.log('[TRACKING] 35. Entered finally block');
       setIsLoading(false);
-      console.log('[TRACKING] 36. isLoading set to false');
     }
   };
 
   const handleLocationUpdate = useCallback((location: Location.LocationObject) => {
     const tripData = tripDataRef.current;
-    if (!tripData) {
-      log('Location', 'No trip data, ignoring update');
-      return;
-    }
-    
+    if (!tripData) return;
+
     const speedKmh = (location.coords.speed || 0) * 3.6;
     const speed = Math.max(0, Math.round(speedKmh));
-    
+
     setCurrentSpeed(speed);
-    
+
     // Calculate distance from previous location
     if (previousLocation.current) {
       const dist = calculateDistance(
@@ -425,37 +366,34 @@ export default function TodayScreen() {
       tripData.distance += dist;
     }
     previousLocation.current = location;
-    
+
     // Update max speed
     if (speed > tripData.maxSpeed) {
       tripData.maxSpeed = speed;
     }
-    
-    // Track speed readings for average
+
+    // Track speed readings
     tripData.speedReadings.push(speed);
-    
+
     // Detect hard braking (speed decrease > 15 km/h per second)
     const speedDiff = previousSpeed.current - speed;
     if (speedDiff > 15 && previousSpeed.current > 20) {
       tripData.hardBrakes++;
-      log('Event', `Hard brake detected! Speed diff: ${speedDiff}`);
-      showToast('⚠️ تنبيه: فرملة مفاجئة! خفف السرعة قليلاً وحاول التوقف بهدوء.');
+      showToast('⚠️ فرملة مفاجئة!');
     }
-    
-    // Detect hard acceleration (speed increase > 15 km/h per second)
+
+    // Detect hard acceleration
     const speedIncrease = speed - previousSpeed.current;
     if (speedIncrease > 15) {
       tripData.hardAccelerations++;
-      log('Event', `Hard acceleration detected! Speed increase: ${speedIncrease}`);
     }
-    
+
     // Detect speeding (> 130 km/h)
     if (speed > 130 && previousSpeed.current <= 130) {
       tripData.speedingCount++;
-      log('Event', `Speeding detected! Speed: ${speed}`);
-      showToast('⚠️ تنبيه: تجاوزت السرعة المسموحة! خفف السرعة.');
+      showToast('⚠️ تجاوزت السرعة المسموحة!');
     }
-    
+
     previousSpeed.current = speed;
     tripDataRef.current = tripData;
     setCurrentTrip({ ...tripData });
@@ -463,42 +401,41 @@ export default function TodayScreen() {
 
   const stopTracking = async () => {
     log('Tracking', '========== STOP TRACKING ==========');
-    
+
     const tripData = tripDataRef.current;
     if (!tripData) {
       log('Tracking', 'No trip data to save');
       return;
     }
-    
+
     setIsLoading(true);
+    
     try {
-      // Stop foreground location tracking
+      // Stop foreground watcher
       if (locationSubscription.current) {
-        log('Tracking', 'Stopping foreground watcher...');
         locationSubscription.current.remove();
         locationSubscription.current = null;
       }
 
-      // Stop background location tracking
+      // Stop background task
       try {
-        const isTaskRunning = await TaskManager.isTaskRegisteredAsync(LOCATION_TASK_NAME);
-        if (isTaskRunning) {
-          log('Tracking', 'Stopping background task...');
+        const isRunning = await TaskManager.isTaskRegisteredAsync(LOCATION_TASK_NAME);
+        if (isRunning) {
           await Location.stopLocationUpdatesAsync(LOCATION_TASK_NAME);
         }
-      } catch (stopError) {
-        log('Tracking', 'Error stopping background task', stopError);
+      } catch (e) {
+        // Ignore
       }
 
       // Calculate final stats
       const endTime = new Date();
       const durationMs = endTime.getTime() - tripData.startTime.getTime();
       const durationMinutes = durationMs / 60000;
-      
+
       const avgSpeed = tripData.speedReadings.length > 0
         ? tripData.speedReadings.reduce((a, b) => a + b, 0) / tripData.speedReadings.length
         : 0;
-      
+
       // Calculate score
       let score = 100;
       score -= tripData.hardBrakes * 4;
@@ -506,20 +443,17 @@ export default function TodayScreen() {
       score -= tripData.speedingCount * 8;
       score = Math.max(0, Math.round(score));
 
-      log('Tracking', 'Trip summary:', {
+      log('Tracking', 'Trip summary', {
         distance: tripData.distance.toFixed(2),
         duration: durationMinutes.toFixed(1),
         maxSpeed: tripData.maxSpeed,
-        avgSpeed: avgSpeed.toFixed(1),
-        hardBrakes: tripData.hardBrakes,
-        hardAccelerations: tripData.hardAccelerations,
         score,
       });
 
-      // Try to save to backend
+      // Save trip
       if (API_URL && !tripData.isOffline) {
         try {
-          const response = await fetch(`${API_URL}/api/trips/${tripData.id}`, {
+          await fetch(`${API_URL}/api/trips/${tripData.id}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -531,38 +465,29 @@ export default function TodayScreen() {
               hard_brakes: tripData.hardBrakes,
               hard_accelerations: tripData.hardAccelerations,
               speeding_count: tripData.speedingCount,
-              score: score,
+              score,
             }),
           });
-
-          if (response.ok) {
-            log('Tracking', 'Trip saved to backend');
-          } else {
-            log('Tracking', 'Failed to save to backend, saving locally');
-            await saveOfflineTrip(tripData, score, durationMinutes, avgSpeed);
-          }
-        } catch (saveError) {
-          log('Tracking', 'Backend save error, saving locally', saveError);
+        } catch (e) {
           await saveOfflineTrip(tripData, score, durationMinutes, avgSpeed);
         }
       } else {
-        // Save offline
         await saveOfflineTrip(tripData, score, durationMinutes, avgSpeed);
       }
 
-      // Show Arabic feedback message based on score
+      // Show feedback
       let feedbackTitle = '';
       let feedbackMessage = '';
-      
+
       if (score > 80) {
         feedbackTitle = 'قيادة ممتازة! 🌟';
-        feedbackMessage = `أنت سائق مسؤول. استمر على هذا المنوال!\n\nالنقاط: ${score}\nالمسافة: ${tripData.distance.toFixed(2)} كم\nالمدة: ${durationMinutes.toFixed(1)} دقيقة`;
+        feedbackMessage = `أنت سائق مسؤول!\n\nالنقاط: ${score}\nالمسافة: ${tripData.distance.toFixed(2)} كم\nالمدة: ${durationMinutes.toFixed(1)} دقيقة`;
       } else if (score >= 50) {
         feedbackTitle = 'قيادة جيدة 👍';
-        feedbackMessage = `ولكن هناك مجال للتحسن. انتبه للفرامل المفاجئة.\n\nالنقاط: ${score}\nالمسافة: ${tripData.distance.toFixed(2)} كم\nالمدة: ${durationMinutes.toFixed(1)} دقيقة`;
+        feedbackMessage = `هناك مجال للتحسن.\n\nالنقاط: ${score}\nالمسافة: ${tripData.distance.toFixed(2)} كم\nالمدة: ${durationMinutes.toFixed(1)} دقيقة`;
       } else {
         feedbackTitle = 'تنبيه! ⚠️';
-        feedbackMessage = `قيادتك تحتاج إلى تحسين كبير. حاول القيادة بهدوء أكبر والتزم بالسرعة المحددة.\n\nالنقاط: ${score}\nالمسافة: ${tripData.distance.toFixed(2)} كم\nالمدة: ${durationMinutes.toFixed(1)} دقيقة`;
+        feedbackMessage = `حاول القيادة بهدوء أكبر.\n\nالنقاط: ${score}\nالمسافة: ${tripData.distance.toFixed(2)} كم\nالمدة: ${durationMinutes.toFixed(1)} دقيقة`;
       }
 
       Alert.alert(feedbackTitle, feedbackMessage, [{ text: 'حسناً' }]);
@@ -574,26 +499,24 @@ export default function TodayScreen() {
       setIsTracking(false);
       previousSpeed.current = 0;
       previousLocation.current = null;
-      
-      // Refresh today's score
+
       if (API_URL) {
         fetchTodayScore(deviceId);
       }
-      
+
     } catch (error: any) {
-      log('Tracking', 'Error stopping tracking', error);
-      Alert.alert('خطأ', 'فشل حفظ الرحلة. يرجى المحاولة مرة أخرى.');
+      log('Tracking', 'Error stopping: ' + error.message);
+      Alert.alert('خطأ', 'فشل حفظ الرحلة.');
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Save trip data locally when offline
   const saveOfflineTrip = async (tripData: TripData, score: number, duration: number, avgSpeed: number) => {
     try {
       const existingTrips = await AsyncStorage.getItem(TRIPS_STORAGE_KEY);
       const trips = existingTrips ? JSON.parse(existingTrips) : [];
-      
+
       trips.push({
         id: tripData.id,
         start_time: tripData.startTime.toISOString(),
@@ -605,27 +528,27 @@ export default function TodayScreen() {
         hard_brakes: tripData.hardBrakes,
         hard_accelerations: tripData.hardAccelerations,
         speeding_count: tripData.speedingCount,
-        score: score,
+        score,
         synced: false,
       });
-      
+
       await AsyncStorage.setItem(TRIPS_STORAGE_KEY, JSON.stringify(trips));
       log('Tracking', 'Trip saved locally');
     } catch (error) {
-      log('Tracking', 'Error saving offline trip', error);
+      log('Tracking', 'Error saving offline trip');
     }
   };
 
-  // Haversine formula to calculate distance between two coordinates
+  // Haversine formula
   const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
     const R = 6371;
     const dLat = (lat2 - lat1) * Math.PI / 180;
     const dLon = (lon2 - lon1) * Math.PI / 180;
-    const a = 
-      Math.sin(dLat/2) * Math.sin(dLat/2) +
-      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
-      Math.sin(dLon/2) * Math.sin(dLon/2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+      Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     return R * c;
   };
 
@@ -643,7 +566,7 @@ export default function TodayScreen() {
         <Text style={styles.headerSubtitle}>Smart Driving Analytics</Text>
       </View>
 
-      <View style={styles.content}>
+      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Today's Score Card */}
         <View style={styles.scoreCard}>
           <Text style={styles.scoreLabel}>Today's Score</Text>
@@ -686,7 +609,9 @@ export default function TodayScreen() {
             <View style={styles.statDivider} />
             <View style={styles.statItem}>
               <Ionicons name="warning" size={20} color="#EF4444" />
-              <Text style={styles.statValue}>{currentTrip.hardBrakes + currentTrip.hardAccelerations}</Text>
+              <Text style={styles.statValue}>
+                {currentTrip.hardBrakes + currentTrip.hardAccelerations}
+              </Text>
               <Text style={styles.statLabel}>events</Text>
             </View>
           </View>
@@ -699,48 +624,41 @@ export default function TodayScreen() {
             {isTracking ? 'Recording trip...' : 'Not tracking'}
           </Text>
         </View>
+      </ScrollView>
 
-        {/* Debug Info (can be removed in production) */}
-        {debugInfo ? (
-          <Text style={styles.debugText}>{debugInfo}</Text>
-        ) : null}
-
-        {/* Control Buttons */}
-        <View style={styles.buttonContainer}>
-          {!isTracking ? (
-            <TouchableOpacity
-              style={[styles.button, styles.startButton]}
-              onPress={startTracking}
-              disabled={isLoading}
-              activeOpacity={0.8}
-            >
-              {isLoading ? (
-                <ActivityIndicator color="#FFFFFF" size="small" />
-              ) : (
-                <>
-                  <Ionicons name="play" size={24} color="#FFFFFF" />
-                  <Text style={styles.buttonText}>Start Tracking</Text>
-                </>
-              )}
-            </TouchableOpacity>
-          ) : (
-            <TouchableOpacity
-              style={[styles.button, styles.stopButton]}
-              onPress={stopTracking}
-              disabled={isLoading}
-              activeOpacity={0.8}
-            >
-              {isLoading ? (
-                <ActivityIndicator color="#FFFFFF" size="small" />
-              ) : (
-                <>
-                  <Ionicons name="stop" size={24} color="#FFFFFF" />
-                  <Text style={styles.buttonText}>Stop Tracking</Text>
-                </>
-              )}
-            </TouchableOpacity>
-          )}
-        </View>
+      {/* Control Buttons */}
+      <View style={styles.buttonContainer}>
+        {!isTracking ? (
+          <TouchableOpacity
+            style={[styles.button, styles.startButton]}
+            onPress={startTracking}
+            disabled={isLoading}
+          >
+            {isLoading ? (
+              <ActivityIndicator color="#FFFFFF" />
+            ) : (
+              <>
+                <Ionicons name="play" size={24} color="#FFFFFF" />
+                <Text style={styles.buttonText}>Start Tracking</Text>
+              </>
+            )}
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity
+            style={[styles.button, styles.stopButton]}
+            onPress={stopTracking}
+            disabled={isLoading}
+          >
+            {isLoading ? (
+              <ActivityIndicator color="#FFFFFF" />
+            ) : (
+              <>
+                <Ionicons name="stop" size={24} color="#FFFFFF" />
+                <Text style={styles.buttonText}>Stop Tracking</Text>
+              </>
+            )}
+          </TouchableOpacity>
+        )}
       </View>
     </SafeAreaView>
   );
@@ -878,13 +796,8 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#9CA3AF',
   },
-  debugText: {
-    fontSize: 10,
-    color: '#6B7280',
-    textAlign: 'center',
-    marginBottom: 12,
-  },
   buttonContainer: {
+    paddingHorizontal: 24,
     marginTop: 'auto',
     marginBottom: Platform.OS === 'ios' ? 20 : 10,
   },
