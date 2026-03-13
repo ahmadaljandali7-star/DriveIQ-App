@@ -191,8 +191,26 @@ export default function TodayScreen() {
     // ========== DIAGNOSTIC LOGS ==========
     console.log('[TRACKING] 1. ========== START TRACKING ==========');
     console.log('[TRACKING] 2. StartTracking function entered');
-    // ======================================
     
+    // Check task status first
+    console.log('[TRACKING] 🔍 Checking task status...');
+    try {
+      const isTaskDefined = TaskManager.isTaskDefined(LOCATION_TASK_NAME);
+      console.log(`[TRACKING] 📊 Task defined: ${isTaskDefined}`);
+      
+      const isTaskRegistered = await TaskManager.isTaskRegisteredAsync(LOCATION_TASK_NAME);
+      console.log(`[TRACKING] 📊 Task registered: ${isTaskRegistered}`);
+      
+      if (!isTaskDefined) {
+        console.error('[TRACKING] ❌ CRITICAL: Task not defined!');
+        Alert.alert('خطأ', 'لم يتم تهيئة نظام التتبع بشكل صحيح. أعد تشغيل التطبيق.');
+        return;
+      }
+    } catch (taskError) {
+      console.error('[TRACKING] ❌ Error checking task:', taskError);
+    }
+    // ======================================
+
     // Check foreground permission
     if (!locationPermission) {
       console.log('[TRACKING] 3. FAILED: No foreground permission');
@@ -313,9 +331,9 @@ export default function TodayScreen() {
           });
 
           backgroundStarted = true;
-          console.log('[TRACKING] 24. Background location started successfully!');
+          console.log('[TRACKING] 24. ✅ Background location started successfully!');
         } catch (bgError: any) {
-          console.log('[TRACKING] 25. Background location FAILED:', bgError.message);
+          console.log('[TRACKING] 25. ❌ Background location FAILED:', bgError.message);
           showToast('تحذير: لا يمكن تشغيل التتبع في الخلفية');
         }
       } else {
@@ -335,9 +353,9 @@ export default function TodayScreen() {
             handleLocationUpdate(location);
           }
         );
-        console.log('[TRACKING] 28. Foreground watcher started successfully!');
+        console.log('[TRACKING] 28. ✅ Foreground watcher started successfully!');
       } catch (fgError: any) {
-        console.log('[TRACKING] 29. Foreground watcher FAILED:', fgError.message);
+        console.log('[TRACKING] 29. ❌ Foreground watcher FAILED:', fgError.message);
         throw new Error(`فشل بدء تتبع الموقع: ${fgError.message}`);
       }
 
@@ -346,7 +364,7 @@ export default function TodayScreen() {
       console.log('[TRACKING] 30. isTracking set to true');
 
       // Show success message in Arabic
-      console.log('[TRACKING] 31. SUCCESS: Tracking started!');
+      console.log('[TRACKING] 31. ✅ SUCCESS: Tracking started!');
       Alert.alert(
         'انطلاقة آمنة! 🚗',
         `دعنا نلتقط رحلتك. شد حزام الأمان!\n\n${isOffline ? '(وضع غير متصل)' : ''}`,
@@ -354,7 +372,7 @@ export default function TodayScreen() {
       );
 
     } catch (error: any) {
-      console.log('[TRACKING] 32. ERROR: Entered catch block');
+      console.log('[TRACKING] 32. ❌ ERROR: Entered catch block');
       console.log('[TRACKING] 33. Error details:', error.message);
 
       // Clean up any partial state
