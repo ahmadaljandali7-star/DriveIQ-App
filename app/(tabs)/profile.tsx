@@ -6,29 +6,261 @@ import {
   ScrollView,
   RefreshControl,
   ActivityIndicator,
+  Switch,
+  TouchableOpacity,
+  Dimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
+import * as Haptics from 'expo-haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withSpring,
+  withTiming,
+  withRepeat,
+  withSequence,
+  Easing,
+  interpolate,
+} from 'react-native-reanimated';
+import Svg, { Circle, Defs, LinearGradient as SvgGradient, Stop } from 'react-native-svg';
 
-const API_URL = process.env.EXPO_PUBLIC_BACKEND_URL || '';
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const TRIPS_STORAGE_KEY = 'driveiq_offline_trips';
+const DARK_MODE_KEY = 'driveiq_dark_mode';
+const USERNAME_KEY = 'driveiq_username';
 
 interface UserStats {
   total_trips: number;
   total_distance: number;
   average_score: number;
   best_score: number;
+  total_duration: number;
 }
+
+interface Achievement {
+  id: string;
+  title: string;
+  description: string;
+  icon: string;
+  color: string;
+  unlocked: boolean;
+  progress: number;
+  target: number;
+}
+
+// Animated Circle Progress Component
+const AnimatedCircle = ({ 
+  progress, 
+  size = 80, 
+  strokeWidth = 8, 
+  color = '#00AAFF',
+  label,
+  value,
+  unit,
+}: { 
+  progress: number;
+  size?: number;
+  strokeWidth?: number;
+  color?: string;
+  label: string;
+  value: string | number;
+  unit?: string;
+}) => {
+  const animatedProgress = useSharedValue(0);
+  const radius = (size - strokeWidth) / 2;
+  const circumference = radius * 2 * Math.PI;
+
+  useEffect(() => {
+    animatedProgress.value = withTiming(progress, { 
+      duration: 1500, 
+      easing: Easing.out(Easing.cubic) 
+    });
+  }, [progress]);
+
+  const strokeDashoffset = circumference - (progress * circumference);
+
+  return (
+    <View style={[styles.circleContainer, { width: size + 20, height: size + 50 }]}>
+      <View style={{ width: size, height: size }}>
+        <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+          <Defs>
+            <SvgGradient id={`gradient-${label}`} x1="0%" y1="0%" x2="100%" y2="100%">
+              <Stop offset="0%" stopColor={color} stopOpacity="1" />
+              <Stop offset="100%" stopColor={color} stopOpacity="0.5" />
+            </SvgGradient>
+          </Defs>
+          {/* Background circle */}
+          <Circle
+            cx={size / 2}
+            cy={size / 2}
+            r={radius}
+            stroke="#1E3A5F"
+            strokeWidth={strokeWidth}
+            fill="transparent"
+          />
+          {/* Progress circle */}
+          <Circle
+            cx={size / 2}
+            cy={size / 2}
+            r={radius}
+            stroke={`url(#gradient-${label})`}
+            strokeWidth={strokeWidth}
+            fill="transparent"
+            strokeDasharray={circumference}
+            strokeDashoffset={strokeDashoffset}
+            strokeLinecap="round"
+            rotation={-90}
+            origin={`${size / 2}, ${size / 2}`}
+          />
+        </Svg>
+        <View style={[styles.circleContent, { width: size, height: size }]}>
+          <Text style={styles.circleValue}>{value}</Text>
+          {unit && <Text style={styles.circleUnit}>{unit}</Text>}
+        </View>
+      </View>
+      <Text style={styles.circleLabel}>{label}</Text>
+    </View>
+  );
+};
+
+// Achievement Badge Component
+const AchievementBadge = ({ 
+  achievement, 
+  index 
+}: { 
+  achievement: Achievement; 
+  index: number;
+}) => {
+  const scale = useSharedValue(0);
+  const rotation = useSharedValue(0);
+
+  useEffect(() => {
+    const delay = index * 150;
+    setTimeout(() => {
+      scale.value = withSpring(1, { damping: 12 });
+      if (achievement.unlocked) {
+        rotation.value = withSequence(
+          withTiming(10, { duration: 100 }),
+          withTiming(-10, { duration: 100 }),
+          withTiming(0, { duration: 100 })
+        );
+      }
+    }, delay);
+  }, []);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [
+      { scale: scale.value },
+      { rotate: `${rotation.value}deg` }
+    ],
+  }));
+
+  return (
+    <Animated.View style={[styles.achievementBadge, animatedStyle]}>
+      <LinearGradient
+        colors={achievement.unlocked 
+          ? [`${achievement.color}30`, `${achievement.color}10`] 
+          : ['rgba(30,58,95,0.5)', 'rgba(30,58,95,0.3)']}
+        style={styles.achievementGradient}
+      >
+        <View style={[
+          styles.achievementIcon,
+          { backgroundColor: achievement.unlocked ? `${achievement.color}20` : '#1E3A5F' }
+        ]}>
+          <Ionicons 
+            name={achievement.icon as any} 
+            size={24} 
+            color={achievement.unlocked ? achievement.color : '#4B5563'} 
+          />
+        </View>
+        <View style={styles.achievementInfo}>
+          <Text style={[
+            styles.achievementTitle,
+            { color: achievement.unlocked ? '#FFFFFF' : '#6B7280' }
+          ]}>
+            {achievement.title}
+          </Text>
+          <Text style={styles.achievementDesc}>{achievement.description}</Text>
+          {!achievement.unlocked && (
+            <View style={styles.achievementProgress}>
+              <View style={styles.achievementProgressBg}>
+                <View 
+                  style={[
+                    styles.achievementProgressFill,
+                    { 
+                      width: `${(achievement.progress / achievement.target) * 100}%`,
+                      backgroundColor: achievement.color 
+                    }
+                  ]} 
+                />
+              </View>
+              <Text style={styles.achievementProgressText}>
+                {achievement.progress}/{achievement.target}
+              </Text>
+            </View>
+          )}
+        </View>
+        {achievement.unlocked && (
+          <View style={styles.unlockedBadge}>
+            <Ionicons name="checkmark-circle" size={20} color={achievement.color} />
+          </View>
+        )}
+      </LinearGradient>
+    </Animated.View>
+  );
+};
+
+// Generate avatar color based on name
+const getAvatarColor = (name: string): string[] => {
+  const colors = [
+    ['#667eea', '#764ba2'],
+    ['#f093fb', '#f5576c'],
+    ['#4facfe', '#00f2fe'],
+    ['#43e97b', '#38f9d7'],
+    ['#fa709a', '#fee140'],
+    ['#a8edea', '#fed6e3'],
+    ['#ff9a9e', '#fecfef'],
+    ['#ffecd2', '#fcb69f'],
+  ];
+  
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  
+  return colors[Math.abs(hash) % colors.length];
+};
 
 export default function ProfileScreen() {
   const [stats, setStats] = useState<UserStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [deviceId, setDeviceId] = useState<string>('');
+  const [deviceId, setDeviceId] = useState('');
+  const [darkMode, setDarkMode] = useState(true);
+  const [username, setUsername] = useState('سائق');
+  const [achievements, setAchievements] = useState<Achievement[]>([]);
+
+  const avatarScale = useSharedValue(0);
+  const statsOpacity = useSharedValue(0);
 
   useEffect(() => {
     initializeAndFetch();
+    
+    // Entrance animations
+    avatarScale.value = withSpring(1, { damping: 15, delay: 200 });
+    statsOpacity.value = withTiming(1, { duration: 600, easing: Easing.out(Easing.cubic) });
   }, []);
+
+  const avatarAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: avatarScale.value }],
+  }));
+
+  const statsAnimatedStyle = useAnimatedStyle(() => ({
+    opacity: statsOpacity.value,
+  }));
 
   const initializeAndFetch = async () => {
     try {
@@ -38,7 +270,20 @@ export default function ProfileScreen() {
         await AsyncStorage.setItem('deviceId', id);
       }
       setDeviceId(id);
-      await fetchStats(id);
+
+      // Load dark mode preference
+      const darkModeValue = await AsyncStorage.getItem(DARK_MODE_KEY);
+      if (darkModeValue !== null) {
+        setDarkMode(darkModeValue === 'true');
+      }
+
+      // Load username
+      const savedUsername = await AsyncStorage.getItem(USERNAME_KEY);
+      if (savedUsername) {
+        setUsername(savedUsername);
+      }
+
+      await fetchStats();
     } catch (error) {
       console.error('Error initializing:', error);
     } finally {
@@ -46,23 +291,125 @@ export default function ProfileScreen() {
     }
   };
 
-  const fetchStats = async (id: string) => {
+  const fetchStats = async () => {
     try {
-      const response = await fetch(`${API_URL}/api/stats/${id}`);
-      if (response.ok) {
-        const data = await response.json();
-        setStats(data);
+      const tripsData = await AsyncStorage.getItem(TRIPS_STORAGE_KEY);
+      if (tripsData) {
+        const trips = JSON.parse(tripsData);
+        
+        if (trips.length > 0) {
+          const totalDistance = trips.reduce((sum: number, t: any) => sum + (t.distance_km || 0), 0);
+          const totalDuration = trips.reduce((sum: number, t: any) => sum + (t.duration_minutes || 0), 0);
+          const avgScore = trips.reduce((sum: number, t: any) => sum + (t.score || 0), 0) / trips.length;
+          const bestScore = Math.max(...trips.map((t: any) => t.score || 0));
+
+          setStats({
+            total_trips: trips.length,
+            total_distance: totalDistance,
+            average_score: avgScore,
+            best_score: bestScore,
+            total_duration: totalDuration,
+          });
+
+          // Update achievements based on stats
+          updateAchievements(trips.length, totalDistance, bestScore, avgScore);
+        } else {
+          setStats({
+            total_trips: 0,
+            total_distance: 0,
+            average_score: 0,
+            best_score: 0,
+            total_duration: 0,
+          });
+          updateAchievements(0, 0, 0, 0);
+        }
+      } else {
+        updateAchievements(0, 0, 0, 0);
       }
     } catch (error) {
       console.error('Error fetching stats:', error);
     }
   };
 
+  const updateAchievements = (trips: number, distance: number, bestScore: number, avgScore: number) => {
+    const achievementsList: Achievement[] = [
+      {
+        id: 'first_trip',
+        title: 'الرحلة الأولى',
+        description: 'أكمل رحلتك الأولى',
+        icon: 'car-sport',
+        color: '#10B981',
+        unlocked: trips >= 1,
+        progress: Math.min(trips, 1),
+        target: 1,
+      },
+      {
+        id: 'road_warrior',
+        title: 'محارب الطريق',
+        description: 'أكمل 10 رحلات',
+        icon: 'shield-checkmark',
+        color: '#3B82F6',
+        unlocked: trips >= 10,
+        progress: Math.min(trips, 10),
+        target: 10,
+      },
+      {
+        id: 'perfect_driver',
+        title: 'سائق مثالي',
+        description: 'احصل على 100 نقطة في رحلة',
+        icon: 'trophy',
+        color: '#F59E0B',
+        unlocked: bestScore >= 100,
+        progress: bestScore,
+        target: 100,
+      },
+      {
+        id: 'long_distance',
+        title: 'رحال المسافات',
+        description: 'اقطع 50 كم إجمالي',
+        icon: 'navigate',
+        color: '#8B5CF6',
+        unlocked: distance >= 50,
+        progress: Math.min(Math.round(distance), 50),
+        target: 50,
+      },
+      {
+        id: 'consistent',
+        title: 'القيادة المتزنة',
+        description: 'حافظ على متوسط 80+ نقطة',
+        icon: 'star',
+        color: '#EC4899',
+        unlocked: avgScore >= 80 && trips >= 5,
+        progress: Math.round(avgScore),
+        target: 80,
+      },
+      {
+        id: 'century',
+        title: 'نادي المئة',
+        description: 'أكمل 100 رحلة',
+        icon: 'medal',
+        color: '#FFD700',
+        unlocked: trips >= 100,
+        progress: Math.min(trips, 100),
+        target: 100,
+      },
+    ];
+
+    setAchievements(achievementsList);
+  };
+
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await fetchStats(deviceId);
+    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    await fetchStats();
     setRefreshing(false);
-  }, [deviceId]);
+  }, []);
+
+  const toggleDarkMode = async (value: boolean) => {
+    setDarkMode(value);
+    await AsyncStorage.setItem(DARK_MODE_KEY, value.toString());
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  };
 
   const getScoreColor = (score: number) => {
     if (score >= 80) return '#10B981';
@@ -70,159 +417,207 @@ export default function ProfileScreen() {
     return '#EF4444';
   };
 
-  const getScoreGrade = (score: number) => {
-    if (score >= 90) return 'Excellent Driver';
-    if (score >= 80) return 'Good Driver';
-    if (score >= 60) return 'Average Driver';
-    return 'Needs Improvement';
+  const getDriverLevel = (avgScore: number, trips: number): string => {
+    if (trips === 0) return 'سائق جديد';
+    if (avgScore >= 90) return 'سائق محترف';
+    if (avgScore >= 80) return 'سائق ماهر';
+    if (avgScore >= 60) return 'سائق متوسط';
+    return 'سائق مبتدئ';
   };
+
+  const avatarColors = getAvatarColor(username);
+  const unlockedCount = achievements.filter(a => a.unlocked).length;
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <LinearGradient colors={['#0A1628', '#0F2847', '#0A1628']} style={styles.container}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#0066CC" />
+          <ActivityIndicator size="large" color="#00AAFF" />
         </View>
-      </SafeAreaView>
+      </LinearGradient>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            tintColor="#0066CC"
-            colors={['#0066CC']}
-          />
-        }
-      >
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>Profile</Text>
-          <Text style={styles.headerSubtitle}>Your driving statistics</Text>
-        </View>
-
-        {/* Profile Avatar */}
-        <View style={styles.avatarContainer}>
-          <View style={styles.avatar}>
-            <Ionicons name="person" size={48} color="#0066CC" />
+    <LinearGradient colors={['#0A1628', '#0F2847', '#0A1628']} style={styles.container}>
+      <SafeAreaView style={styles.container} edges={['top']}>
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.scrollContent}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor="#00AAFF"
+              colors={['#00AAFF']}
+            />
+          }
+        >
+          {/* Header */}
+          <View style={styles.header}>
+            <Text style={styles.headerTitle}>الملف الشخصي</Text>
+            <Text style={styles.headerSubtitle}>إحصائيات قيادتك</Text>
           </View>
-          <Text style={styles.driverLabel}>
-            {stats && stats.average_score > 0
-              ? getScoreGrade(stats.average_score)
-              : 'New Driver'}
-          </Text>
-        </View>
 
-        {/* Main Score Card */}
-        {stats && stats.total_trips > 0 && (
-          <View style={styles.mainScoreCard}>
-            <Text style={styles.mainScoreLabel}>Average Score</Text>
-            <Text style={[styles.mainScoreValue, { color: getScoreColor(stats.average_score) }]}>
-              {stats.average_score.toFixed(0)}
+          {/* Profile Avatar */}
+          <Animated.View style={[styles.avatarContainer, avatarAnimatedStyle]}>
+            <LinearGradient
+              colors={avatarColors}
+              style={styles.avatar}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+            >
+              <Ionicons name="person" size={50} color="#FFFFFF" />
+            </LinearGradient>
+            <Text style={styles.driverLabel}>
+              {stats && stats.average_score > 0 
+                ? getDriverLevel(stats.average_score, stats.total_trips) 
+                : 'سائق جديد'}
             </Text>
-            <View style={styles.scoreBar}>
-              <View
-                style={[
-                  styles.scoreBarFill,
-                  {
-                    width: `${stats.average_score}%`,
-                    backgroundColor: getScoreColor(stats.average_score),
-                  },
-                ]}
+            <View style={styles.levelBadge}>
+              <Ionicons name="star" size={14} color="#FFD700" />
+              <Text style={styles.levelText}>
+                المستوى {Math.min(Math.floor((stats?.total_trips || 0) / 5) + 1, 20)}
+              </Text>
+            </View>
+          </Animated.View>
+
+          {/* Main Score Card */}
+          {stats && stats.total_trips > 0 && (
+            <Animated.View style={[styles.mainScoreCard, statsAnimatedStyle]}>
+              <LinearGradient
+                colors={['rgba(255,255,255,0.1)', 'rgba(255,255,255,0.05)']}
+                style={styles.scoreCardGradient}
+              >
+                <Text style={styles.mainScoreLabel}>متوسط النقاط</Text>
+                <Text style={[styles.mainScoreValue, { color: getScoreColor(stats.average_score) }]}>
+                  {stats.average_score.toFixed(0)}
+                </Text>
+                <View style={styles.scoreBar}>
+                  <View 
+                    style={[
+                      styles.scoreBarFill, 
+                      { 
+                        width: `${stats.average_score}%`,
+                        backgroundColor: getScoreColor(stats.average_score)
+                      }
+                    ]} 
+                  />
+                </View>
+              </LinearGradient>
+            </Animated.View>
+          )}
+
+          {/* Animated Stats Circles */}
+          <Animated.View style={[styles.circlesContainer, statsAnimatedStyle]}>
+            <AnimatedCircle
+              progress={(stats?.total_trips || 0) / 100}
+              color="#00AAFF"
+              label="الرحلات"
+              value={stats?.total_trips || 0}
+            />
+            <AnimatedCircle
+              progress={Math.min((stats?.total_distance || 0) / 500, 1)}
+              color="#10B981"
+              label="المسافة"
+              value={(stats?.total_distance || 0).toFixed(1)}
+              unit="كم"
+            />
+            <AnimatedCircle
+              progress={(stats?.best_score || 0) / 100}
+              color="#F59E0B"
+              label="أفضل نتيجة"
+              value={stats?.best_score || '--'}
+            />
+          </Animated.View>
+
+          {/* Achievements Section */}
+          <View style={styles.achievementsSection}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>الإنجازات</Text>
+              <Text style={styles.achievementCount}>
+                {unlockedCount}/{achievements.length}
+              </Text>
+            </View>
+            {achievements.map((achievement, index) => (
+              <AchievementBadge 
+                key={achievement.id} 
+                achievement={achievement} 
+                index={index}
+              />
+            ))}
+          </View>
+
+          {/* Settings Section */}
+          <View style={styles.settingsSection}>
+            <Text style={styles.sectionTitle}>الإعدادات</Text>
+            
+            <View style={styles.settingItem}>
+              <View style={styles.settingLeft}>
+                <View style={[styles.settingIcon, { backgroundColor: 'rgba(139, 92, 246, 0.1)' }]}>
+                  <Ionicons name="moon" size={20} color="#8B5CF6" />
+                </View>
+                <Text style={styles.settingText}>الوضع الليلي</Text>
+              </View>
+              <Switch
+                value={darkMode}
+                onValueChange={toggleDarkMode}
+                trackColor={{ false: '#1E3A5F', true: '#0066CC' }}
+                thumbColor={darkMode ? '#00AAFF' : '#6B7280'}
               />
             </View>
           </View>
-        )}
 
-        {/* Stats Grid */}
-        <View style={styles.statsGrid}>
-          <View style={styles.statCard}>
-            <View style={[styles.statIconContainer, { backgroundColor: 'rgba(0, 102, 204, 0.1)' }]}>
-              <Ionicons name="car" size={24} color="#0066CC" />
-            </View>
-            <Text style={styles.statValue}>
-              {stats ? stats.total_trips : 0}
-            </Text>
-            <Text style={styles.statLabel}>Total Trips</Text>
+          {/* Tips Section */}
+          <View style={styles.tipsSection}>
+            <Text style={styles.sectionTitle}>نصائح القيادة</Text>
+            
+            <LinearGradient
+              colors={['rgba(16, 185, 129, 0.1)', 'rgba(16, 185, 129, 0.05)']}
+              style={styles.tipCard}
+            >
+              <View style={styles.tipIconContainer}>
+                <Ionicons name="speedometer" size={24} color="#10B981" />
+              </View>
+              <View style={styles.tipContent}>
+                <Text style={styles.tipTitle}>حافظ على سرعة ثابتة</Text>
+                <Text style={styles.tipText}>
+                  تجنب التسارع والفرملة المفاجئة لتحسين نقاطك
+                </Text>
+              </View>
+            </LinearGradient>
+
+            <LinearGradient
+              colors={['rgba(245, 158, 11, 0.1)', 'rgba(245, 158, 11, 0.05)']}
+              style={styles.tipCard}
+            >
+              <View style={styles.tipIconContainer}>
+                <Ionicons name="warning" size={24} color="#F59E0B" />
+              </View>
+              <View style={styles.tipContent}>
+                <Text style={styles.tipTitle}>التزم بحدود السرعة</Text>
+                <Text style={styles.tipText}>
+                  تجاوز 130 كم/س يؤثر بشكل كبير على نقاطك
+                </Text>
+              </View>
+            </LinearGradient>
           </View>
 
-          <View style={styles.statCard}>
-            <View style={[styles.statIconContainer, { backgroundColor: 'rgba(16, 185, 129, 0.1)' }]}>
-              <Ionicons name="navigate" size={24} color="#10B981" />
-            </View>
-            <Text style={styles.statValue}>
-              {stats ? stats.total_distance.toFixed(1) : '0.0'}
-            </Text>
-            <Text style={styles.statLabel}>Total Distance (km)</Text>
+          {/* App Info */}
+          <View style={styles.appInfo}>
+            <Text style={styles.appName}>DriveIQ</Text>
+            <Text style={styles.appVersion}>الإصدار 1.0.0</Text>
+            <Text style={styles.deviceId}>معرف الجهاز: {deviceId.slice(-8)}</Text>
           </View>
-
-          <View style={styles.statCard}>
-            <View style={[styles.statIconContainer, { backgroundColor: 'rgba(245, 158, 11, 0.1)' }]}>
-              <Ionicons name="trophy" size={24} color="#F59E0B" />
-            </View>
-            <Text style={styles.statValue}>
-              {stats && stats.best_score > 0 ? stats.best_score : '--'}
-            </Text>
-            <Text style={styles.statLabel}>Best Score</Text>
-          </View>
-
-          <View style={styles.statCard}>
-            <View style={[styles.statIconContainer, { backgroundColor: 'rgba(139, 92, 246, 0.1)' }]}>
-              <Ionicons name="star" size={24} color="#8B5CF6" />
-            </View>
-            <Text style={styles.statValue}>
-              {stats && stats.average_score > 0 ? stats.average_score.toFixed(1) : '--'}
-            </Text>
-            <Text style={styles.statLabel}>Avg Score</Text>
-          </View>
-        </View>
-
-        {/* Tips Section */}
-        <View style={styles.tipsSection}>
-          <Text style={styles.tipsTitle}>Driving Tips</Text>
-          <View style={styles.tipCard}>
-            <View style={styles.tipIconContainer}>
-              <Ionicons name="speedometer" size={20} color="#0066CC" />
-            </View>
-            <View style={styles.tipContent}>
-              <Text style={styles.tipTitle}>Maintain Steady Speed</Text>
-              <Text style={styles.tipText}>
-                Avoid sudden acceleration and hard braking to improve your score.
-              </Text>
-            </View>
-          </View>
-          <View style={styles.tipCard}>
-            <View style={styles.tipIconContainer}>
-              <Ionicons name="alert-circle" size={20} color="#F59E0B" />
-            </View>
-            <View style={styles.tipContent}>
-              <Text style={styles.tipTitle}>Stay Within Speed Limits</Text>
-              <Text style={styles.tipText}>
-                Speeding over 130 km/h significantly impacts your driving score.
-              </Text>
-            </View>
-          </View>
-        </View>
-
-        {/* App Info */}
-        <View style={styles.appInfo}>
-          <Text style={styles.appName}>DriveIQ</Text>
-          <Text style={styles.appVersion}>Version 1.0.0</Text>
-        </View>
-      </ScrollView>
-    </SafeAreaView>
+        </ScrollView>
+      </SafeAreaView>
+    </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0A1628',
   },
   loadingContainer: {
     flex: 1,
@@ -230,15 +625,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   scrollContent: {
-    paddingBottom: 32,
+    paddingBottom: 100,
   },
   header: {
     paddingHorizontal: 24,
     paddingTop: 16,
     paddingBottom: 16,
+    alignItems: 'flex-start',
   },
   headerTitle: {
-    fontSize: 32,
+    fontSize: 36,
     fontWeight: 'bold',
     color: '#FFFFFF',
   },
@@ -255,27 +651,44 @@ const styles = StyleSheet.create({
     width: 100,
     height: 100,
     borderRadius: 50,
-    backgroundColor: 'rgba(0, 102, 204, 0.1)',
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 3,
-    borderColor: '#0066CC',
+    borderColor: 'rgba(255,255,255,0.2)',
   },
   driverLabel: {
-    fontSize: 18,
-    fontWeight: '600',
+    fontSize: 20,
+    fontWeight: '700',
     color: '#FFFFFF',
     marginTop: 16,
   },
+  levelBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 215, 0, 0.1)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+    marginTop: 8,
+    gap: 4,
+  },
+  levelText: {
+    color: '#FFD700',
+    fontSize: 12,
+    fontWeight: '600',
+  },
   mainScoreCard: {
-    backgroundColor: '#0F1F38',
     marginHorizontal: 24,
     borderRadius: 20,
+    overflow: 'hidden',
+    marginBottom: 24,
+  },
+  scoreCardGradient: {
     padding: 24,
     alignItems: 'center',
-    marginBottom: 24,
+    borderRadius: 20,
     borderWidth: 1,
-    borderColor: '#1E3A5F',
+    borderColor: 'rgba(255,255,255,0.1)',
   },
   mainScoreLabel: {
     fontSize: 14,
@@ -298,64 +711,161 @@ const styles = StyleSheet.create({
     height: '100%',
     borderRadius: 4,
   },
-  statsGrid: {
+  circlesContainer: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
+    justifyContent: 'space-around',
     paddingHorizontal: 16,
-    gap: 12,
+    marginBottom: 32,
   },
-  statCard: {
-    backgroundColor: '#0F1F38',
-    borderRadius: 16,
-    padding: 16,
-    width: '47%',
+  circleContainer: {
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#1E3A5F',
   },
-  statIconContainer: {
+  circleContent: {
+    position: 'absolute',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  circleValue: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+  },
+  circleUnit: {
+    fontSize: 10,
+    color: '#9CA3AF',
+    marginTop: -2,
+  },
+  circleLabel: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginTop: 8,
+    textAlign: 'center',
+  },
+  achievementsSection: {
+    paddingHorizontal: 24,
+    marginBottom: 32,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+  },
+  achievementCount: {
+    fontSize: 14,
+    color: '#00AAFF',
+    fontWeight: '600',
+  },
+  achievementBadge: {
+    marginBottom: 12,
+    borderRadius: 16,
+    overflow: 'hidden',
+  },
+  achievementGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.05)',
+  },
+  achievementIcon: {
     width: 48,
     height: 48,
     borderRadius: 24,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 12,
+    marginRight: 12,
   },
-  statValue: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
+  achievementInfo: {
+    flex: 1,
   },
-  statLabel: {
+  achievementTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 2,
+  },
+  achievementDesc: {
     fontSize: 12,
     color: '#6B7280',
-    marginTop: 4,
-    textAlign: 'center',
   },
-  tipsSection: {
-    paddingHorizontal: 24,
-    paddingTop: 32,
-  },
-  tipsTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
-    marginBottom: 16,
-  },
-  tipCard: {
+  achievementProgress: {
     flexDirection: 'row',
-    backgroundColor: '#0F1F38',
-    borderRadius: 12,
+    alignItems: 'center',
+    marginTop: 8,
+    gap: 8,
+  },
+  achievementProgressBg: {
+    flex: 1,
+    height: 4,
+    backgroundColor: '#1E3A5F',
+    borderRadius: 2,
+    overflow: 'hidden',
+  },
+  achievementProgressFill: {
+    height: '100%',
+    borderRadius: 2,
+  },
+  achievementProgressText: {
+    fontSize: 10,
+    color: '#6B7280',
+  },
+  unlockedBadge: {
+    marginLeft: 8,
+  },
+  settingsSection: {
+    paddingHorizontal: 24,
+    marginBottom: 32,
+  },
+  settingItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: 'rgba(15, 31, 56, 0.8)',
     padding: 16,
-    marginBottom: 12,
+    borderRadius: 16,
+    marginTop: 12,
     borderWidth: 1,
     borderColor: '#1E3A5F',
   },
-  tipIconContainer: {
+  settingLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  settingIcon: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: 'rgba(0, 102, 204, 0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  settingText: {
+    fontSize: 16,
+    color: '#FFFFFF',
+  },
+  tipsSection: {
+    paddingHorizontal: 24,
+    marginBottom: 32,
+  },
+  tipCard: {
+    flexDirection: 'row',
+    borderRadius: 16,
+    padding: 16,
+    marginTop: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.05)',
+  },
+  tipIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: 'rgba(255,255,255,0.05)',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
@@ -376,16 +886,23 @@ const styles = StyleSheet.create({
   },
   appInfo: {
     alignItems: 'center',
-    paddingTop: 32,
+    paddingTop: 16,
+    paddingBottom: 32,
   },
   appName: {
-    fontSize: 18,
+    fontSize: 24,
     fontWeight: 'bold',
-    color: '#0066CC',
+    color: '#00AAFF',
   },
   appVersion: {
-    fontSize: 12,
+    fontSize: 14,
     color: '#6B7280',
     marginTop: 4,
   },
+  deviceId: {
+    fontSize: 10,
+    color: '#4B5563',
+    marginTop: 8,
+  },
 });
+

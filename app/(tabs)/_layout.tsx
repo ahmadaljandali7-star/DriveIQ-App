@@ -1,3 +1,4 @@
+typescript
 import React from 'react';
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -9,17 +10,28 @@ export default function TabLayout() {
       screenOptions={{
         headerShown: false,
         tabBarStyle: styles.tabBar,
-        tabBarActiveTintColor: '#0066CC',
+        tabBarActiveTintColor: '#00AAFF',
         tabBarInactiveTintColor: '#6B7280',
         tabBarLabelStyle: styles.tabBarLabel,
+        tabBarBackground: () => (
+          <View style={StyleSheet.absoluteFill}>
+            <View style={styles.tabBarBackground} />
+          </View>
+        ),
       }}
     >
       <Tabs.Screen
         name="index"
         options={{
           title: 'Today',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="speedometer" size={size} color={color} />
+          tabBarIcon: ({ color, focused }) => (
+            <View style={[styles.iconContainer, focused && styles.iconContainerActive]}>
+              <Ionicons 
+                name={focused ? 'speedometer' : 'speedometer-outline'} 
+                size={24} 
+                color={color} 
+              />
+            </View>
           ),
         }}
       />
@@ -27,8 +39,14 @@ export default function TabLayout() {
         name="history"
         options={{
           title: 'History',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="time" size={size} color={color} />
+          tabBarIcon: ({ color, focused }) => (
+            <View style={[styles.iconContainer, focused && styles.iconContainerActive]}>
+              <Ionicons 
+                name={focused ? 'time' : 'time-outline'} 
+                size={24} 
+                color={color} 
+              />
+            </View>
           ),
         }}
       />
@@ -36,8 +54,14 @@ export default function TabLayout() {
         name="profile"
         options={{
           title: 'Profile',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="person" size={size} color={color} />
+          tabBarIcon: ({ color, focused }) => (
+            <View style={[styles.iconContainer, focused && styles.iconContainerActive]}>
+              <Ionicons 
+                name={focused ? 'person' : 'person-outline'} 
+                size={24} 
+                color={color} 
+              />
+            </View>
           ),
         }}
       />
@@ -47,15 +71,30 @@ export default function TabLayout() {
 
 const styles = StyleSheet.create({
   tabBar: {
-    backgroundColor: '#0F1F38',
+    backgroundColor: 'rgba(15, 31, 56, 0.95)',
     borderTopColor: '#1E3A5F',
     borderTopWidth: 1,
     height: Platform.OS === 'ios' ? 88 : 70,
     paddingBottom: Platform.OS === 'ios' ? 28 : 10,
     paddingTop: 10,
+    position: 'absolute',
+    elevation: 0,
+  },
+  tabBarBackground: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(15, 31, 56, 0.98)',
+    borderTopWidth: 1,
+    borderTopColor: '#1E3A5F',
   },
   tabBarLabel: {
     fontSize: 12,
     fontWeight: '600',
+  },
+  iconContainer: {
+    padding: 4,
+    borderRadius: 12,
+  },
+  iconContainerActive: {
+    backgroundColor: 'rgba(0, 170, 255, 0.1)',
   },
 });

@@ -1,3 +1,4 @@
+typescript
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
@@ -10,17 +11,29 @@ import {
   ToastAndroid,
   Linking,
   ScrollView,
+  Dimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import * as Location from 'expo-location';
 import * as TaskManager from 'expo-task-manager';
+import * as Haptics from 'expo-haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withSpring,
+  withRepeat,
+  withTiming,
+  withSequence,
+  Easing,
+} from 'react-native-reanimated';
+import Svg, { Circle, Defs, LinearGradient as SvgGradient, Stop } from 'react-native-svg';
 
-// Import task name from helper (task is defined in /index.js)
 import { LOCATION_TASK_NAME, checkTaskStatus } from '../locationTask';
 
-const API_URL = process.env.EXPO_PUBLIC_BACKEND_URL || '';
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const WELCOME_SHOWN_KEY = 'driveiq_welcome_shown';
 const TRIPS_STORAGE_KEY = 'driveiq_offline_trips';
 
@@ -37,7 +50,114 @@ interface TripData {
   isOffline: boolean;
 }
 
-// Helper function for logging
+// Animated components
+const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
+
+// Speed Gauge Component
+const SpeedGauge = ({ speed, maxSpeed = 200 }: { speed: number; maxSpeed?: number }) => {
+  const size = 180;
+  const strokeWidth = 12;
+  const radius = (size - strokeWidth) / 2;
+  const circumference = radius * 2 * Math.PI;
+  const percentage = Math.min(speed / maxSpeed, 1);
+  const strokeDashoffset = circumference - (percentage * circumference * 0.75);
+  
+  const getSpeedColor = () => {
+    if (speed > 130) return '#EF4444';
+    if (speed > 100) return '#F59E0B';
+    return '#10B981';
+  };
+
+  return (
+    <View style={styles.gaugeContainer}>
+      <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+        <Defs>
+          <SvgGradient id="speedGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+            <Stop offset="0%" stopColor="#10B981" />
+            <Stop offset="50%" stopColor="#F59E0B" />
+            <Stop offset="100%" stopColor="#EF4444" />
+          </SvgGradient>
+        </Defs>
+        {/* Background arc */}
+        <Circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          stroke="#1E3A5F"
+          strokeWidth={strokeWidth}
+          fill="transparent"
+          strokeDasharray={`${circumference * 0.75} ${circumference}`}
+          strokeLinecap="round"
+          rotation={135}
+          origin={`${size / 2}, ${size / 2}`}
+        />
+        {/* Progress arc */}
+        <Circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          stroke={getSpeedColor()}
+          strokeWidth={strokeWidth}
+          fill="transparent"
+          strokeDasharray={circumference}
+          strokeDashoffset={strokeDashoffset}
+          strokeLinecap="round"
+          rotation={135}
+          origin={`${size / 2}, ${size / 2}`}
+        />
+      </Svg>
+      <View style={styles.gaugeTextContainer}>
+        <Text style={styles.gaugeSpeed}>{speed}</Text>
+        <Text style={styles.gaugeUnit}>km/h</Text>
+      </View>
+    </View>
+  );
+};
+
+// Confetti particle component
+const ConfettiParticle = ({ delay }: { delay: number }) => {
+  const translateY = useSharedValue(-50);
+  const translateX = useSharedValue(0);
+  const opacity = useSharedValue(1);
+  const rotate = useSharedValue(0);
+  
+  useEffect(() => {
+    const randomX = (Math.random() - 0.5) * SCREEN_WIDTH;
+    translateY.value = withTiming(400, { duration: 2000 + delay });
+    translateX.value = withTiming(randomX, { duration: 2000 + delay });
+    rotate.value = withTiming(360 * 3, { duration: 2000 + delay });
+    opacity.value = withTiming(0, { duration: 2000 + delay });
+  }, []);
+  
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [
+      { translateY: translateY.value },
+      { translateX: translateX.value },
+      { rotate: `${rotate.value}deg` },
+    ],
+    opacity: opacity.value,
+  }));
+  
+  const colors = ['#FFD700', '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4'];
+  const color = colors[Math.floor(Math.random() * colors.length)];
+  
+  return (
+    <Animated.View
+      style={[
+        {
+          position: 'absolute',
+          width: 10,
+          height: 10,
+          backgroundColor: color,
+          borderRadius: 2,
+        },
+        animatedStyle,
+      ]}
+    />
+  );
+};
+
+// Log helper
 const log = (tag: string, message: string, data?: any) => {
   const timestamp = new Date().toISOString().split('T')[1].split('.')[0];
   if (data) {
@@ -47,7 +167,7 @@ const log = (tag: string, message: string, data?: any) => {
   }
 };
 
-// Show toast for Android
+// Toast helper
 const showToast = (message: string) => {
   if (Platform.OS === 'android') {
     ToastAndroid.show(message, ToastAndroid.LONG);
@@ -64,42 +184,80 @@ export default function TodayScreen() {
   const [locationPermission, setLocationPermission] = useState(false);
   const [backgroundPermission, setBackgroundPermission] = useState(false);
   const [taskReady, setTaskReady] = useState(false);
+  const [showConfetti, setShowConfetti] = useState(false);
 
   const locationSubscription = useRef<Location.LocationSubscription | null>(null);
   const previousSpeed = useRef(0);
   const previousLocation = useRef<Location.LocationObject | null>(null);
   const tripDataRef = useRef<TripData | null>(null);
 
-  // Initialize on mount
+  // Animations
+  const pulseScale = useSharedValue(1);
+  const buttonScale = useSharedValue(1);
+  const cardOpacity = useSharedValue(0);
+  const cardTranslateY = useSharedValue(20);
+
+  // Initialize animations on mount
   useEffect(() => {
+    // Entrance animation for cards
+    cardOpacity.value = withTiming(1, { duration: 600 });
+    cardTranslateY.value = withSpring(0, { damping: 15 });
+    
     initializeApp();
   }, []);
+
+  // Pulse animation for tracking
+  useEffect(() => {
+    if (isTracking) {
+      pulseScale.value = withRepeat(
+        withSequence(
+          withTiming(1.05, { duration: 1000, easing: Easing.inOut(Easing.ease) }),
+          withTiming(1, { duration: 1000, easing: Easing.inOut(Easing.ease) })
+        ),
+        -1,
+        true
+      );
+    } else {
+      pulseScale.value = withTiming(1);
+    }
+  }, [isTracking]);
+
+  const cardAnimatedStyle = useAnimatedStyle(() => ({
+    opacity: cardOpacity.value,
+    transform: [{ translateY: cardTranslateY.value }],
+  }));
+
+  const pulseAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: pulseScale.value }],
+  }));
+
+  const buttonAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: buttonScale.value }],
+  }));
 
   const initializeApp = async () => {
     log('Init', 'Starting app initialization...');
     
-    // 1. Check if background task is defined
     const status = await checkTaskStatus();
     setTaskReady(status.isDefined);
     
     if (!status.isDefined) {
       log('Init', 'WARNING: Background task not defined!');
     }
-
-    // 2. Initialize device ID
-    await initializeDevice();
     
-    // 3. Show welcome message
+    await initializeDevice();
     await showWelcomeMessage();
+    await loadTodayScore();
   };
 
   const showWelcomeMessage = async () => {
     try {
       const welcomeShown = await AsyncStorage.getItem(WELCOME_SHOWN_KEY);
       if (!welcomeShown) {
+        await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         Alert.alert(
           'مرحباً بك في DriveIQ! 🚗',
-          'هذا التطبيق يساعدك على تحسين قيادتك.\n\nاضغط على "بدء التتبع" قبل الانطلاق.',
+          'هذا التطبيق يساعدك على تحسين قيادتك وتتبع رحلاتك.\n\nاضغط على "بدء التتبع" قبل الانطلاق.',
           [{ text: 'فهمت', onPress: () => {} }]
         );
         await AsyncStorage.setItem(WELCOME_SHOWN_KEY, 'true');
@@ -111,7 +269,6 @@ export default function TodayScreen() {
 
   const initializeDevice = async () => {
     try {
-      // Get or create device ID
       let id = await AsyncStorage.getItem('deviceId');
       if (!id) {
         id = 'device_' + Math.random().toString(36).substring(2, 15);
@@ -120,7 +277,6 @@ export default function TodayScreen() {
       }
       setDeviceId(id);
 
-      // Request foreground location permission
       log('Permissions', 'Requesting foreground permission...');
       const { status: foregroundStatus } = await Location.requestForegroundPermissionsAsync();
       log('Permissions', 'Foreground permission: ' + foregroundStatus);
@@ -138,39 +294,31 @@ export default function TodayScreen() {
         return;
       }
 
-      // Request background location permission for Android
       if (Platform.OS === 'android') {
         log('Permissions', 'Requesting background permission...');
         const { status: backgroundStatus } = await Location.requestBackgroundPermissionsAsync();
         log('Permissions', 'Background permission: ' + backgroundStatus);
         setBackgroundPermission(backgroundStatus === 'granted');
-        
+
         if (backgroundStatus !== 'granted') {
           showToast('للحصول على تتبع مستمر، اختر "طوال الوقت" في إعدادات الموقع');
         }
       } else {
         setBackgroundPermission(true);
       }
-
-      // Fetch today's score if API is available
-      if (API_URL) {
-        fetchTodayScore(id);
-      }
     } catch (error) {
       log('Init', 'Error initializing device');
     }
   };
 
-  const fetchTodayScore = async (id: string) => {
-    if (!API_URL) return;
-
+  const loadTodayScore = async () => {
     try {
-      const response = await fetch(`${API_URL}/api/trips/device/${id}`);
-      if (response.ok) {
-        const trips = await response.json();
+      const tripsData = await AsyncStorage.getItem(TRIPS_STORAGE_KEY);
+      if (tripsData) {
+        const trips = JSON.parse(tripsData);
         const today = new Date();
         today.setHours(0, 0, 0, 0);
-        
+
         const todayTrips = trips.filter((trip: any) => {
           const tripDate = new Date(trip.start_time);
           return tripDate >= today;
@@ -182,14 +330,22 @@ export default function TodayScreen() {
         }
       }
     } catch (error) {
-      log('Score', 'Error fetching today score');
+      log('Score', 'Error loading today score');
     }
   };
 
   const startTracking = async () => {
     log('Tracking', '========== START TRACKING ==========');
+    
+    // Haptic feedback
+    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
-    // Verify permissions
+    // Button press animation
+    buttonScale.value = withSequence(
+      withTiming(0.95, { duration: 100 }),
+      withTiming(1, { duration: 100 })
+    );
+
     if (!locationPermission) {
       Alert.alert(
         'صلاحية الموقع مطلوبة',
@@ -202,7 +358,6 @@ export default function TodayScreen() {
       return;
     }
 
-    // Verify background task is defined
     const status = await checkTaskStatus();
     if (!status.isDefined) {
       log('Tracking', 'CRITICAL: Background task not defined!');
@@ -214,7 +369,6 @@ export default function TodayScreen() {
       return;
     }
 
-    // Warn about background permission (but don't block)
     if (Platform.OS === 'android' && !backgroundPermission) {
       showToast('تحذير: التتبع قد يتوقف عند إغلاق التطبيق');
     }
@@ -222,33 +376,8 @@ export default function TodayScreen() {
     setIsLoading(true);
 
     try {
-      // Generate trip ID
       const tripId = 'trip_' + Date.now() + '_' + Math.random().toString(36).substring(2, 9);
-      let isOffline = true;
 
-      // Try to create trip in backend
-      if (API_URL) {
-        try {
-          const response = await fetch(`${API_URL}/api/trips`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              device_id: deviceId,
-              start_time: new Date().toISOString(),
-            }),
-          });
-
-          if (response.ok) {
-            const trip = await response.json();
-            isOffline = false;
-            log('Tracking', 'Trip created on server: ' + trip.id);
-          }
-        } catch (apiError) {
-          log('Tracking', 'Backend unavailable, using offline mode');
-        }
-      }
-
-      // Initialize trip data
       const tripData: TripData = {
         id: tripId,
         startTime: new Date(),
@@ -259,7 +388,7 @@ export default function TodayScreen() {
         hardAccelerations: 0,
         speedingCount: 0,
         speedReadings: [],
-        isOffline,
+        isOffline: true,
       };
 
       setCurrentTrip(tripData);
@@ -276,11 +405,11 @@ export default function TodayScreen() {
         // Ignore
       }
 
-      // Start background location tracking with foreground service
+      // Start background location tracking
       if (Platform.OS === 'android') {
         try {
           log('Tracking', 'Starting background location with foreground service...');
-          
+
           await Location.startLocationUpdatesAsync(LOCATION_TASK_NAME, {
             accuracy: Location.Accuracy.BestForNavigation,
             timeInterval: 2000,
@@ -294,15 +423,14 @@ export default function TodayScreen() {
             pausesUpdatesAutomatically: false,
             activityType: Location.ActivityType.AutomotiveNavigation,
           });
-          
+
           log('Tracking', '✅ Background location started successfully');
         } catch (bgError: any) {
           log('Tracking', '⚠️ Background location failed: ' + bgError.message);
-          // Continue with foreground-only tracking
         }
       }
 
-      // Start foreground watcher for UI updates
+      // Start foreground watcher
       log('Tracking', 'Starting foreground location watcher...');
       locationSubscription.current = await Location.watchPositionAsync(
         {
@@ -314,23 +442,23 @@ export default function TodayScreen() {
           handleLocationUpdate(location);
         }
       );
-      
-      log('Tracking', '✅ Foreground watcher started');
 
-      // Update state
+      log('Tracking', '✅ Foreground watcher started');
       setIsTracking(true);
 
-      // Success message
+      // Success feedback
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+
       Alert.alert(
         'انطلاقة آمنة! 🚗',
-        `دعنا نلتقط رحلتك. شد حزام الأمان!${isOffline ? '\n\n(وضع غير متصل)' : ''}`,
+        'دعنا نلتقط رحلتك. شد حزام الأمان!',
         [{ text: 'حسناً' }]
       );
 
     } catch (error: any) {
       log('Tracking', '❌ Error: ' + error.message);
-      
-      // Cleanup
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+
       if (locationSubscription.current) {
         locationSubscription.current.remove();
         locationSubscription.current = null;
@@ -355,7 +483,7 @@ export default function TodayScreen() {
 
     setCurrentSpeed(speed);
 
-    // Calculate distance from previous location
+    // Calculate distance
     if (previousLocation.current) {
       const dist = calculateDistance(
         previousLocation.current.coords.latitude,
@@ -367,18 +495,17 @@ export default function TodayScreen() {
     }
     previousLocation.current = location;
 
-    // Update max speed
     if (speed > tripData.maxSpeed) {
       tripData.maxSpeed = speed;
     }
 
-    // Track speed readings
     tripData.speedReadings.push(speed);
 
-    // Detect hard braking (speed decrease > 15 km/h per second)
+    // Detect hard braking
     const speedDiff = previousSpeed.current - speed;
     if (speedDiff > 15 && previousSpeed.current > 20) {
       tripData.hardBrakes++;
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
       showToast('⚠️ فرملة مفاجئة!');
     }
 
@@ -388,9 +515,10 @@ export default function TodayScreen() {
       tripData.hardAccelerations++;
     }
 
-    // Detect speeding (> 130 km/h)
+    // Detect speeding
     if (speed > 130 && previousSpeed.current <= 130) {
       tripData.speedingCount++;
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
       showToast('⚠️ تجاوزت السرعة المسموحة!');
     }
 
@@ -402,6 +530,13 @@ export default function TodayScreen() {
   const stopTracking = async () => {
     log('Tracking', '========== STOP TRACKING ==========');
 
+    // Button animation and haptic
+    buttonScale.value = withSequence(
+      withTiming(0.95, { duration: 100 }),
+      withTiming(1, { duration: 100 })
+    );
+    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+
     const tripData = tripDataRef.current;
     if (!tripData) {
       log('Tracking', 'No trip data to save');
@@ -409,15 +544,13 @@ export default function TodayScreen() {
     }
 
     setIsLoading(true);
-    
+
     try {
-      // Stop foreground watcher
       if (locationSubscription.current) {
         locationSubscription.current.remove();
         locationSubscription.current = null;
       }
 
-      // Stop background task
       try {
         const isRunning = await TaskManager.isTaskRegisteredAsync(LOCATION_TASK_NAME);
         if (isRunning) {
@@ -427,7 +560,6 @@ export default function TodayScreen() {
         // Ignore
       }
 
-      // Calculate final stats
       const endTime = new Date();
       const durationMs = endTime.getTime() - tripData.startTime.getTime();
       const durationMinutes = durationMs / 60000;
@@ -450,44 +582,31 @@ export default function TodayScreen() {
         score,
       });
 
-      // Save trip
-      if (API_URL && !tripData.isOffline) {
-        try {
-          await fetch(`${API_URL}/api/trips/${tripData.id}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              end_time: endTime.toISOString(),
-              distance_km: parseFloat(tripData.distance.toFixed(2)),
-              duration_minutes: parseFloat(durationMinutes.toFixed(2)),
-              max_speed: tripData.maxSpeed,
-              avg_speed: parseFloat(avgSpeed.toFixed(1)),
-              hard_brakes: tripData.hardBrakes,
-              hard_accelerations: tripData.hardAccelerations,
-              speeding_count: tripData.speedingCount,
-              score,
-            }),
-          });
-        } catch (e) {
-          await saveOfflineTrip(tripData, score, durationMinutes, avgSpeed);
-        }
-      } else {
-        await saveOfflineTrip(tripData, score, durationMinutes, avgSpeed);
+      await saveOfflineTrip(tripData, score, durationMinutes, avgSpeed);
+
+      // Show confetti for perfect score
+      if (score === 100) {
+        setShowConfetti(true);
+        await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        setTimeout(() => setShowConfetti(false), 3000);
       }
 
-      // Show feedback
+      // Cinematic reveal of score
       let feedbackTitle = '';
       let feedbackMessage = '';
 
-      if (score > 80) {
-        feedbackTitle = 'قيادة ممتازة! 🌟';
-        feedbackMessage = `أنت سائق مسؤول!\n\nالنقاط: ${score}\nالمسافة: ${tripData.distance.toFixed(2)} كم\nالمدة: ${durationMinutes.toFixed(1)} دقيقة`;
+      if (score >= 90) {
+        feedbackTitle = '🌟 قيادة مثالية!';
+        feedbackMessage = `أنت سائق محترف!\n\n🏆 النقاط: ${score}/100\n📏 المسافة: ${tripData.distance.toFixed(2)} كم\n⏱️ المدة: ${durationMinutes.toFixed(1)} دقيقة`;
+      } else if (score >= 70) {
+        feedbackTitle = '👍 قيادة جيدة جداً';
+        feedbackMessage = `أداء ممتاز!\n\n✅ النقاط: ${score}/100\n📏 المسافة: ${tripData.distance.toFixed(2)} كم\n⏱️ المدة: ${durationMinutes.toFixed(1)} دقيقة`;
       } else if (score >= 50) {
-        feedbackTitle = 'قيادة جيدة 👍';
-        feedbackMessage = `هناك مجال للتحسن.\n\nالنقاط: ${score}\nالمسافة: ${tripData.distance.toFixed(2)} كم\nالمدة: ${durationMinutes.toFixed(1)} دقيقة`;
+        feedbackTitle = '💪 يمكنك التحسن';
+        feedbackMessage = `هناك مجال للتحسن.\n\n📊 النقاط: ${score}/100\n📏 المسافة: ${tripData.distance.toFixed(2)} كم\n⏱️ المدة: ${durationMinutes.toFixed(1)} دقيقة`;
       } else {
-        feedbackTitle = 'تنبيه! ⚠️';
-        feedbackMessage = `حاول القيادة بهدوء أكبر.\n\nالنقاط: ${score}\nالمسافة: ${tripData.distance.toFixed(2)} كم\nالمدة: ${durationMinutes.toFixed(1)} دقيقة`;
+        feedbackTitle = '⚠️ قيادة تحتاج انتباه';
+        feedbackMessage = `حاول القيادة بهدوء أكبر.\n\n⚠️ النقاط: ${score}/100\n📏 المسافة: ${tripData.distance.toFixed(2)} كم\n⏱️ المدة: ${durationMinutes.toFixed(1)} دقيقة`;
       }
 
       Alert.alert(feedbackTitle, feedbackMessage, [{ text: 'حسناً' }]);
@@ -500,9 +619,7 @@ export default function TodayScreen() {
       previousSpeed.current = 0;
       previousLocation.current = null;
 
-      if (API_URL) {
-        fetchTodayScore(deviceId);
-      }
+      await loadTodayScore();
 
     } catch (error: any) {
       log('Tracking', 'Error stopping: ' + error.message);
@@ -517,7 +634,7 @@ export default function TodayScreen() {
       const existingTrips = await AsyncStorage.getItem(TRIPS_STORAGE_KEY);
       const trips = existingTrips ? JSON.parse(existingTrips) : [];
 
-      trips.push({
+      trips.unshift({
         id: tripData.id,
         start_time: tripData.startTime.toISOString(),
         end_time: new Date().toISOString(),
@@ -539,7 +656,6 @@ export default function TodayScreen() {
     }
   };
 
-  // Haversine formula
   const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
     const R = 6371;
     const dLat = (lat2 - lat1) * Math.PI / 180;
@@ -560,124 +676,170 @@ export default function TodayScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>DriveIQ</Text>
-        <Text style={styles.headerSubtitle}>Smart Driving Analytics</Text>
-      </View>
+    <LinearGradient
+      colors={['#0A1628', '#0F2847', '#0A1628']}
+      style={styles.container}
+    >
+      <SafeAreaView style={styles.container} edges={['top']}>
+        {/* Confetti Effect */}
+        {showConfetti && (
+          <View style={styles.confettiContainer}>
+            {[...Array(30)].map((_, i) => (
+              <ConfettiParticle key={i} delay={i * 50} />
+            ))}
+          </View>
+        )}
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Today's Score Card */}
-        <View style={styles.scoreCard}>
-          <Text style={styles.scoreLabel}>Today's Score</Text>
-          <Text style={[styles.scoreValue, { color: getScoreColor(todayScore) }]}>
-            {todayScore !== null ? todayScore : '--'}
-          </Text>
-          <Text style={styles.scoreSubtext}>
-            {todayScore !== null ? 'Based on today\'s trips' : 'No trips recorded today'}
-          </Text>
+        {/* Header */}
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>DriveIQ</Text>
+          <Text style={styles.headerSubtitle}>تحليل القيادة الذكي</Text>
         </View>
 
-        {/* Speed Display */}
-        <View style={styles.speedCard}>
-          <View style={styles.speedIconContainer}>
-            <Ionicons name="speedometer" size={32} color="#0066CC" />
-          </View>
-          <View style={styles.speedInfo}>
-            <Text style={styles.speedValue}>{currentSpeed}</Text>
-            <Text style={styles.speedUnit}>km/h</Text>
-          </View>
-          <Text style={styles.speedLabel}>
-            {isTracking ? 'Current Speed' : 'Speed'}
-          </Text>
-        </View>
-
-        {/* Trip Stats (shown during tracking) */}
-        {isTracking && currentTrip && (
-          <View style={styles.tripStats}>
-            <View style={styles.statItem}>
-              <Ionicons name="navigate" size={20} color="#0066CC" />
-              <Text style={styles.statValue}>{currentTrip.distance.toFixed(2)}</Text>
-              <Text style={styles.statLabel}>km</Text>
-            </View>
-            <View style={styles.statDivider} />
-            <View style={styles.statItem}>
-              <Ionicons name="flash" size={20} color="#F59E0B" />
-              <Text style={styles.statValue}>{currentTrip.maxSpeed}</Text>
-              <Text style={styles.statLabel}>max km/h</Text>
-            </View>
-            <View style={styles.statDivider} />
-            <View style={styles.statItem}>
-              <Ionicons name="warning" size={20} color="#EF4444" />
-              <Text style={styles.statValue}>
-                {currentTrip.hardBrakes + currentTrip.hardAccelerations}
+        <ScrollView 
+          style={styles.content}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.scrollContent}
+        >
+          {/* Today's Score Card - Glassmorphism */}
+          <Animated.View style={[styles.scoreCard, cardAnimatedStyle]}>
+            <LinearGradient
+              colors={['rgba(255,255,255,0.1)', 'rgba(255,255,255,0.05)']}
+              style={styles.glassCard}
+            >
+              <Text style={styles.scoreLabel}>نقاط اليوم</Text>
+              <Text style={[styles.scoreValue, { color: getScoreColor(todayScore) }]}>
+                {todayScore !== null ? todayScore : '--'}
               </Text>
-              <Text style={styles.statLabel}>events</Text>
-            </View>
+              <Text style={styles.scoreSubtext}>
+                {todayScore !== null ? 'بناءً على رحلات اليوم' : 'لم تسجل رحلات اليوم'}
+              </Text>
+            </LinearGradient>
+          </Animated.View>
+
+          {/* Speed Gauge */}
+          <Animated.View style={[styles.speedCard, pulseAnimatedStyle]}>
+            <SpeedGauge speed={currentSpeed} />
+            <Text style={styles.speedLabel}>
+              {isTracking ? 'السرعة الحالية' : 'السرعة'}
+            </Text>
+          </Animated.View>
+
+          {/* Trip Stats */}
+          {isTracking && currentTrip && (
+            <Animated.View style={[styles.tripStats, cardAnimatedStyle]}>
+              <View style={styles.statItem}>
+                <Ionicons name="navigate" size={20} color="#00AAFF" />
+                <Text style={styles.statValue}>{currentTrip.distance.toFixed(2)}</Text>
+                <Text style={styles.statLabel}>كم</Text>
+              </View>
+              <View style={styles.statDivider} />
+              <View style={styles.statItem}>
+                <Ionicons name="speedometer" size={20} color="#F59E0B" />
+                <Text style={styles.statValue}>{currentTrip.maxSpeed}</Text>
+                <Text style={styles.statLabel}>أقصى سرعة</Text>
+              </View>
+              <View style={styles.statDivider} />
+              <View style={styles.statItem}>
+                <Ionicons name="warning" size={20} color="#EF4444" />
+                <Text style={styles.statValue}>
+                  {currentTrip.hardBrakes + currentTrip.hardAccelerations}
+                </Text>
+                <Text style={styles.statLabel}>أحداث</Text>
+              </View>
+            </Animated.View>
+          )}
+
+          {/* Status Indicator */}
+          <View style={styles.statusContainer}>
+            <Animated.View 
+              style={[
+                styles.statusIndicator,
+                { backgroundColor: isTracking ? '#10B981' : '#6B7280' },
+                isTracking && pulseAnimatedStyle
+              ]}
+            />
+            <Text style={styles.statusText}>
+              {isTracking ? 'جاري تسجيل الرحلة...' : 'غير نشط'}
+            </Text>
           </View>
-        )}
+        </ScrollView>
 
-        {/* Tracking Status */}
-        <View style={styles.statusContainer}>
-          <View style={[styles.statusIndicator, { backgroundColor: isTracking ? '#10B981' : '#6B7280' }]} />
-          <Text style={styles.statusText}>
-            {isTracking ? 'Recording trip...' : 'Not tracking'}
-          </Text>
+        {/* Control Buttons */}
+        <View style={styles.buttonContainer}>
+          {!isTracking ? (
+            <AnimatedTouchable
+              style={[styles.button, styles.startButton, buttonAnimatedStyle]}
+              onPress={startTracking}
+              disabled={isLoading}
+              activeOpacity={0.8}
+            >
+              <LinearGradient
+                colors={['#0088FF', '#0066CC']}
+                style={styles.buttonGradient}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+              >
+                {isLoading ? (
+                  <ActivityIndicator color="#FFFFFF" size="small" />
+                ) : (
+                  <>
+                    <Ionicons name="play-circle" size={28} color="#FFFFFF" />
+                    <Text style={styles.buttonText}>بدء التتبع</Text>
+                  </>
+                )}
+              </LinearGradient>
+            </AnimatedTouchable>
+          ) : (
+            <AnimatedTouchable
+              style={[styles.button, styles.stopButton, buttonAnimatedStyle]}
+              onPress={stopTracking}
+              disabled={isLoading}
+              activeOpacity={0.8}
+            >
+              <LinearGradient
+                colors={['#EF4444', '#DC2626']}
+                style={styles.buttonGradient}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+              >
+                {isLoading ? (
+                  <ActivityIndicator color="#FFFFFF" size="small" />
+                ) : (
+                  <>
+                    <Ionicons name="stop-circle" size={28} color="#FFFFFF" />
+                    <Text style={styles.buttonText}>إيقاف التتبع</Text>
+                  </>
+                )}
+              </LinearGradient>
+            </AnimatedTouchable>
+          )}
         </View>
-      </ScrollView>
-
-      {/* Control Buttons */}
-      <View style={styles.buttonContainer}>
-        {!isTracking ? (
-          <TouchableOpacity
-            style={[styles.button, styles.startButton]}
-            onPress={startTracking}
-            disabled={isLoading}
-          >
-            {isLoading ? (
-              <ActivityIndicator color="#FFFFFF" />
-            ) : (
-              <>
-                <Ionicons name="play" size={24} color="#FFFFFF" />
-                <Text style={styles.buttonText}>Start Tracking</Text>
-              </>
-            )}
-          </TouchableOpacity>
-        ) : (
-          <TouchableOpacity
-            style={[styles.button, styles.stopButton]}
-            onPress={stopTracking}
-            disabled={isLoading}
-          >
-            {isLoading ? (
-              <ActivityIndicator color="#FFFFFF" />
-            ) : (
-              <>
-                <Ionicons name="stop" size={24} color="#FFFFFF" />
-                <Text style={styles.buttonText}>Stop Tracking</Text>
-              </>
-            )}
-          </TouchableOpacity>
-        )}
-      </View>
-    </SafeAreaView>
+      </SafeAreaView>
+    </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0A1628',
+  },
+  confettiContainer: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    zIndex: 100,
   },
   header: {
     paddingHorizontal: 24,
     paddingTop: 16,
     paddingBottom: 8,
+    alignItems: 'flex-start',
   },
   headerTitle: {
-    fontSize: 32,
+    fontSize: 36,
     fontWeight: 'bold',
     color: '#FFFFFF',
+    letterSpacing: 1,
   },
   headerSubtitle: {
     fontSize: 14,
@@ -687,16 +849,22 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     paddingHorizontal: 24,
-    paddingTop: 24,
+  },
+  scrollContent: {
+    paddingTop: 16,
+    paddingBottom: 100,
   },
   scoreCard: {
-    backgroundColor: '#0F1F38',
-    borderRadius: 20,
+    marginBottom: 20,
+    borderRadius: 24,
+    overflow: 'hidden',
+  },
+  glassCard: {
     padding: 24,
     alignItems: 'center',
-    marginBottom: 20,
+    borderRadius: 24,
     borderWidth: 1,
-    borderColor: '#1E3A5F',
+    borderColor: 'rgba(255,255,255,0.1)',
   },
   scoreLabel: {
     fontSize: 16,
@@ -710,50 +878,47 @@ const styles = StyleSheet.create({
   scoreSubtext: {
     fontSize: 12,
     color: '#6B7280',
-    marginTop: 4,
+    marginTop: 8,
   },
   speedCard: {
-    backgroundColor: '#0F1F38',
-    borderRadius: 20,
-    padding: 20,
+    backgroundColor: 'rgba(15, 31, 56, 0.8)',
+    borderRadius: 24,
+    padding: 24,
     alignItems: 'center',
     marginBottom: 20,
     borderWidth: 1,
     borderColor: '#1E3A5F',
   },
-  speedIconContainer: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: 'rgba(0, 102, 204, 0.1)',
+  gaugeContainer: {
+    position: 'relative',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 12,
   },
-  speedInfo: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
+  gaugeTextContainer: {
+    position: 'absolute',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  speedValue: {
+  gaugeSpeed: {
     fontSize: 48,
     fontWeight: 'bold',
     color: '#FFFFFF',
   },
-  speedUnit: {
-    fontSize: 20,
+  gaugeUnit: {
+    fontSize: 16,
     color: '#9CA3AF',
-    marginLeft: 8,
+    marginTop: -4,
   },
   speedLabel: {
     fontSize: 14,
     color: '#6B7280',
-    marginTop: 4,
+    marginTop: 12,
   },
   tripStats: {
     flexDirection: 'row',
-    backgroundColor: '#0F1F38',
-    borderRadius: 16,
-    padding: 16,
+    backgroundColor: 'rgba(15, 31, 56, 0.8)',
+    borderRadius: 20,
+    padding: 20,
     marginBottom: 20,
     borderWidth: 1,
     borderColor: '#1E3A5F',
@@ -768,16 +933,16 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: 'bold',
     color: '#FFFFFF',
-    marginTop: 4,
+    marginTop: 8,
   },
   statLabel: {
     fontSize: 12,
     color: '#6B7280',
-    marginTop: 2,
+    marginTop: 4,
   },
   statDivider: {
     width: 1,
-    height: 40,
+    height: 50,
     backgroundColor: '#1E3A5F',
   },
   statusContainer: {
@@ -787,9 +952,9 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   statusIndicator: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
     marginRight: 8,
   },
   statusText: {
@@ -798,26 +963,29 @@ const styles = StyleSheet.create({
   },
   buttonContainer: {
     paddingHorizontal: 24,
-    marginTop: 'auto',
-    marginBottom: Platform.OS === 'ios' ? 20 : 10,
+    paddingBottom: Platform.OS === 'ios' ? 100 : 90,
   },
   button: {
+    borderRadius: 20,
+    overflow: 'hidden',
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+  },
+  buttonGradient: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 18,
-    borderRadius: 16,
     gap: 12,
   },
-  startButton: {
-    backgroundColor: '#0066CC',
-  },
-  stopButton: {
-    backgroundColor: '#DC2626',
-  },
+  startButton: {},
+  stopButton: {},
   buttonText: {
     fontSize: 18,
-    fontWeight: '600',
+    fontWeight: '700',
     color: '#FFFFFF',
   },
 });
