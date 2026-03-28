@@ -9,9 +9,9 @@ workflows:
         script: npm install --legacy-peer-deps
       - name: Prebuild Expo project
         script: npx expo prebuild --clean
-      - name: Build Android APK
+      - name: Build Android APK with stacktrace
         script: |
           cd android
-          ./gradlew assembleRelease
+          ./gradlew assembleRelease --stacktrace
     artifacts:
       - android/app/build/outputs/apk/release/*.apk
