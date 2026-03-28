@@ -7,9 +7,10 @@ workflows:
     scripts:
       - name: Install dependencies
         script: npm install --legacy-peer-deps
+      - name: Prebuild Expo project
+        script: npx expo prebuild --clean
       - name: Build Android APK
         script: |
-          npx expo prebuild --clean
           cd android
           ./gradlew assembleRelease
     artifacts:
