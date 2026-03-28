@@ -3,7 +3,7 @@ workflows:
     name: Android Build
     max_build_duration: 60
     environment:
-      node: 18
+      node: 22
     scripts:
       - name: Install dependencies
         script: npm install --legacy-peer-deps
