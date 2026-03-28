@@ -6,7 +6,7 @@ workflows:
       node: 18
     scripts:
       - name: Install dependencies
-        script: npm install
+        script: npm install --legacy-peer-deps
       - name: Build Android APK
         script: |
           npx expo prebuild --clean
