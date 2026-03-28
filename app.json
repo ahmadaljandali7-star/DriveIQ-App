@@ -1,74 +1,55 @@
 {
-  "expo": {
-    "name": "DriveIQ",
-    "slug": "driveiq",
-    "version": "1.0.0",
-    "orientation": "portrait",
-    "icon": "./assets/images/image.png",
-    "scheme": "driveiq",
-    "userInterfaceStyle": "automatic",
-    "newArchEnabled": false,
-    "ios": {
-      "supportsTablet": true,
-      "bundleIdentifier": "com.ahmad_aljandali90.driveiq",
-      "infoPlist": {
-        "NSLocationWhenInUseUsageDescription": "DriveIQ needs location to track your driving",
-        "NSLocationAlwaysAndWhenInUseUsageDescription": "DriveIQ needs location to track driving trips in background",
-        "UIBackgroundModes": ["location", "fetch"]
-      }
-    },
-    "android": {
-      "adaptiveIcon": {
-        "foregroundImage": "./assets/images/adaptive-icon.png",
-        "backgroundColor": "#0A1628"
-      },
-      "edgeToEdgeEnabled": true,
-      "permissions": [
-        "ACCESS_COARSE_LOCATION",
-        "ACCESS_FINE_LOCATION",
-        "ACCESS_BACKGROUND_LOCATION",
-        "FOREGROUND_SERVICE",
-        "FOREGROUND_SERVICE_LOCATION",
-        "VIBRATE"
-      ],
-      "package": "com.ahmad_aljandali90.driveiq"
-    },
-    "web": {
-      "bundler": "metro",
-      "output": "static",
-      "favicon": "./assets/images/favicon.png"
-    },
-    "plugins": [
-      "expo-router",
-      [
-        "expo-splash-screen",
-        {
-          "image": "./assets/images/splash-image.png",
-          "imageWidth": 200,
-          "resizeMode": "contain",
-          "backgroundColor": "#0A1628"
-        }
-      ],
-      [
-        "expo-location",
-        {
-          "locationAlwaysAndWhenInUsePermission": "DriveIQ يحتاج صلاحية الموقع لتتبع رحلات القيادة",
-          "locationAlwaysPermission": "DriveIQ يستخدم موقعك لتتبع القيادة حتى عند عدم استخدام التطبيق",
-          "locationWhenInUsePermission": "DriveIQ يحتاج صلاحية الموقع لتتبع قيادتك",
-          "isAndroidBackgroundLocationEnabled": true,
-          "isAndroidForegroundServiceEnabled": true
-        }
-      ],
-      "expo-task-manager"
-    ],
-    "experiments": {
-      "typedRoutes": true
-    },
-    "extra": {
-      "router": {},
-      "eas": {
-        "projectId": "687eee16-858b-4194-90d0-eae3a8b3a8ac"
-      }
+  "name": "DriveIQ",
+  "slug": "driveiq",
+  "version": "1.0.0",
+  "orientation": "portrait",
+  "icon": "./assets/images/icon.png",
+  "scheme": "driveiq",
+  "userInterfaceStyle": "automatic",
+  "newArchEnabled": false,
+  "ios": {
+    "supportsTablet": true,
+    "bundleIdentifier": "com.ahmadaljandali90.driveiq",
+    "infoPlist": {
+      "NSLocationWhenInUseUsageDescription": "DriveIQ needs location to track your driving",
+      "NSLocationAlwaysAndWhenInUseUsageDescription": "DriveIQ needs location to track driving trips in background",
+      "UIBackgroundModes": ["location", "fetch"]
     }
-  }
+  },
+  "android": {
+    "adaptiveIcon": {
+      "foregroundImage": "./assets/images/adaptive-icon.png",
+      "backgroundColor": "#0A1628"
+    },
+    "edgeToEdgeEnabled": true,
+    "permissions": [
+      "ACCESS_COARSE_LOCATION",
+      "ACCESS_FINE_LOCATION",
+      "ACCESS_BACKGROUND_LOCATION",
+      "FOREGROUND_SERVICE",
+      "FOREGROUND_SERVICE_LOCATION",
+      "VIBRATE"
+    ],
+    "package": "com.ahmadaljandali90.driveiq"
+  },
+  "web": {
+    "bundler": "metro",
+    "output": "static",
+    "favicon": "./assets/images/favicon.png"
+  },
+  "plugins": [
+    "expo-router",
+    "expo-splash-screen",
+    [
+      "expo-location",
+      {
+        "locationAlwaysAndWhenInUsePermission": "DriveIQ needs location to track your driving trips",
+        "locationAlwaysPermission": "DriveIQ uses your location to track driving even when not in use",
+        "locationWhenInUsePermission": "DriveIQ needs location to track your driving",
+        "isAndroidBackgroundLocationEnabled": true,
+        "isAndroidForegroundServiceEnabled": true
+      }
+    ],
+    "expo-task-manager"
+  ]
 }
