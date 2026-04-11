@@ -20,10 +20,8 @@ import Animated, {
   useAnimatedStyle,
   withSpring,
   withTiming,
-  withRepeat,
   withSequence,
   Easing,
-  interpolate,
 } from 'react-native-reanimated';
 import Svg, { Circle, Defs, LinearGradient as SvgGradient, Stop } from 'react-native-svg';
 
@@ -92,7 +90,6 @@ const AnimatedCircle = ({
               <Stop offset="100%" stopColor={color} stopOpacity="0.5" />
             </SvgGradient>
           </Defs>
-          {/* Background circle */}
           <Circle
             cx={size / 2}
             cy={size / 2}
@@ -101,7 +98,6 @@ const AnimatedCircle = ({
             strokeWidth={strokeWidth}
             fill="transparent"
           />
-          {/* Progress circle */}
           <Circle
             cx={size / 2}
             cy={size / 2}
@@ -138,7 +134,7 @@ const AchievementBadge = ({
   const rotation = useSharedValue(0);
 
   useEffect(() => {
-    const delay = index * 150;
+    const delayMs = index * 150;
     setTimeout(() => {
       scale.value = withSpring(1, { damping: 12 });
       if (achievement.unlocked) {
@@ -148,7 +144,7 @@ const AchievementBadge = ({
           withTiming(0, { duration: 100 })
         );
       }
-    }, delay);
+    }, delayMs);
   }, []);
 
   const animatedStyle = useAnimatedStyle(() => ({
@@ -249,9 +245,10 @@ export default function ProfileScreen() {
   useEffect(() => {
     initializeAndFetch();
     
-    // Entrance animations
-    avatarScale.value = withSpring(1, { damping: 15, delay: 200 });
-    statsOpacity.value = withTiming(1, { duration: 600, easing: Easing.out(Easing.cubic) });
+    setTimeout(() => {
+      avatarScale.value = withSpring(1, { damping: 15 });
+      statsOpacity.value = withTiming(1, { duration: 600, easing: Easing.out(Easing.cubic) });
+    }, 200);
   }, []);
 
   const avatarAnimatedStyle = useAnimatedStyle(() => ({
@@ -271,13 +268,11 @@ export default function ProfileScreen() {
       }
       setDeviceId(id);
 
-      // Load dark mode preference
       const darkModeValue = await AsyncStorage.getItem(DARK_MODE_KEY);
       if (darkModeValue !== null) {
         setDarkMode(darkModeValue === 'true');
       }
 
-      // Load username
       const savedUsername = await AsyncStorage.getItem(USERNAME_KEY);
       if (savedUsername) {
         setUsername(savedUsername);
@@ -311,7 +306,6 @@ export default function ProfileScreen() {
             total_duration: totalDuration,
           });
 
-          // Update achievements based on stats
           updateAchievements(trips.length, totalDistance, bestScore, avgScore);
         } else {
           setStats({
@@ -453,13 +447,11 @@ export default function ProfileScreen() {
             />
           }
         >
-          {/* Header */}
           <View style={styles.header}>
             <Text style={styles.headerTitle}>الملف الشخصي</Text>
             <Text style={styles.headerSubtitle}>إحصائيات قيادتك</Text>
           </View>
 
-          {/* Profile Avatar */}
           <Animated.View style={[styles.avatarContainer, avatarAnimatedStyle]}>
             <LinearGradient
               colors={avatarColors}
@@ -482,7 +474,6 @@ export default function ProfileScreen() {
             </View>
           </Animated.View>
 
-          {/* Main Score Card */}
           {stats && stats.total_trips > 0 && (
             <Animated.View style={[styles.mainScoreCard, statsAnimatedStyle]}>
               <LinearGradient
@@ -508,7 +499,6 @@ export default function ProfileScreen() {
             </Animated.View>
           )}
 
-          {/* Animated Stats Circles */}
           <Animated.View style={[styles.circlesContainer, statsAnimatedStyle]}>
             <AnimatedCircle
               progress={(stats?.total_trips || 0) / 100}
@@ -531,7 +521,6 @@ export default function ProfileScreen() {
             />
           </Animated.View>
 
-          {/* Achievements Section */}
           <View style={styles.achievementsSection}>
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>الإنجازات</Text>
@@ -548,7 +537,6 @@ export default function ProfileScreen() {
             ))}
           </View>
 
-          {/* Settings Section */}
           <View style={styles.settingsSection}>
             <Text style={styles.sectionTitle}>الإعدادات</Text>
             
@@ -568,7 +556,6 @@ export default function ProfileScreen() {
             </View>
           </View>
 
-          {/* Tips Section */}
           <View style={styles.tipsSection}>
             <Text style={styles.sectionTitle}>نصائح القيادة</Text>
             
@@ -603,7 +590,6 @@ export default function ProfileScreen() {
             </LinearGradient>
           </View>
 
-          {/* App Info */}
           <View style={styles.appInfo}>
             <Text style={styles.appName}>DriveIQ</Text>
             <Text style={styles.appVersion}>الإصدار 1.0.0</Text>
@@ -616,293 +602,57 @@ export default function ProfileScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  loadingContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  scrollContent: {
-    paddingBottom: 100,
-  },
-  header: {
-    paddingHorizontal: 24,
-    paddingTop: 16,
-    paddingBottom: 16,
-    alignItems: 'flex-start',
-  },
-  headerTitle: {
-    fontSize: 36,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
-  },
-  headerSubtitle: {
-    fontSize: 14,
-    color: '#6B7280',
-    marginTop: 4,
-  },
-  avatarContainer: {
-    alignItems: 'center',
-    paddingVertical: 24,
-  },
-  avatar: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 3,
-    borderColor: 'rgba(255,255,255,0.2)',
-  },
-  driverLabel: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#FFFFFF',
-    marginTop: 16,
-  },
-  levelBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255, 215, 0, 0.1)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 12,
-    marginTop: 8,
-    gap: 4,
-  },
-  levelText: {
-    color: '#FFD700',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  mainScoreCard: {
-    marginHorizontal: 24,
-    borderRadius: 20,
-    overflow: 'hidden',
-    marginBottom: 24,
-  },
-  scoreCardGradient: {
-    padding: 24,
-    alignItems: 'center',
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
-  },
-  mainScoreLabel: {
-    fontSize: 14,
-    color: '#9CA3AF',
-    marginBottom: 8,
-  },
-  mainScoreValue: {
-    fontSize: 64,
-    fontWeight: 'bold',
-  },
-  scoreBar: {
-    width: '100%',
-    height: 8,
-    backgroundColor: '#1E3A5F',
-    borderRadius: 4,
-    marginTop: 16,
-    overflow: 'hidden',
-  },
-  scoreBarFill: {
-    height: '100%',
-    borderRadius: 4,
-  },
-  circlesContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    paddingHorizontal: 16,
-    marginBottom: 32,
-  },
-  circleContainer: {
-    alignItems: 'center',
-  },
-  circleContent: {
-    position: 'absolute',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  circleValue: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
-  },
-  circleUnit: {
-    fontSize: 10,
-    color: '#9CA3AF',
-    marginTop: -2,
-  },
-  circleLabel: {
-    fontSize: 12,
-    color: '#6B7280',
-    marginTop: 8,
-    textAlign: 'center',
-  },
-  achievementsSection: {
-    paddingHorizontal: 24,
-    marginBottom: 32,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
-  },
-  achievementCount: {
-    fontSize: 14,
-    color: '#00AAFF',
-    fontWeight: '600',
-  },
-  achievementBadge: {
-    marginBottom: 12,
-    borderRadius: 16,
-    overflow: 'hidden',
-  },
-  achievementGradient: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.05)',
-  },
-  achievementIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
-  },
-  achievementInfo: {
-    flex: 1,
-  },
-  achievementTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 2,
-  },
-  achievementDesc: {
-    fontSize: 12,
-    color: '#6B7280',
-  },
-  achievementProgress: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 8,
-    gap: 8,
-  },
-  achievementProgressBg: {
-    flex: 1,
-    height: 4,
-    backgroundColor: '#1E3A5F',
-    borderRadius: 2,
-    overflow: 'hidden',
-  },
-  achievementProgressFill: {
-    height: '100%',
-    borderRadius: 2,
-  },
-  achievementProgressText: {
-    fontSize: 10,
-    color: '#6B7280',
-  },
-  unlockedBadge: {
-    marginLeft: 8,
-  },
-  settingsSection: {
-    paddingHorizontal: 24,
-    marginBottom: 32,
-  },
-  settingItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: 'rgba(15, 31, 56, 0.8)',
-    padding: 16,
-    borderRadius: 16,
-    marginTop: 12,
-    borderWidth: 1,
-    borderColor: '#1E3A5F',
-  },
-  settingLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  settingIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
-  },
-  settingText: {
-    fontSize: 16,
-    color: '#FFFFFF',
-  },
-  tipsSection: {
-    paddingHorizontal: 24,
-    marginBottom: 32,
-  },
-  tipCard: {
-    flexDirection: 'row',
-    borderRadius: 16,
-    padding: 16,
-    marginTop: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.05)',
-  },
-  tipIconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
-  },
-  tipContent: {
-    flex: 1,
-  },
-  tipTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#FFFFFF',
-    marginBottom: 4,
-  },
-  tipText: {
-    fontSize: 14,
-    color: '#9CA3AF',
-    lineHeight: 20,
-  },
-  appInfo: {
-    alignItems: 'center',
-    paddingTop: 16,
-    paddingBottom: 32,
-  },
-  appName: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#00AAFF',
-  },
-  appVersion: {
-    fontSize: 14,
-    color: '#6B7280',
-    marginTop: 4,
-  },
-  deviceId: {
-    fontSize: 10,
-    color: '#4B5563',
-    marginTop: 8,
-  },
+  container: { flex: 1 },
+  loadingContainer: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  scrollContent: { paddingBottom: 100 },
+  header: { paddingHorizontal: 24, paddingTop: 16, paddingBottom: 16, alignItems: 'flex-start' },
+  headerTitle: { fontSize: 36, fontWeight: 'bold', color: '#FFFFFF' },
+  headerSubtitle: { fontSize: 14, color: '#6B7280', marginTop: 4 },
+  avatarContainer: { alignItems: 'center', paddingVertical: 24 },
+  avatar: { width: 100, height: 100, borderRadius: 50, alignItems: 'center', justifyContent: 'center', borderWidth: 3, borderColor: 'rgba(255,255,255,0.2)' },
+  driverLabel: { fontSize: 20, fontWeight: '700', color: '#FFFFFF', marginTop: 16 },
+  levelBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255, 215, 0, 0.1)', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12, marginTop: 8, gap: 4 },
+  levelText: { color: '#FFD700', fontSize: 12, fontWeight: '600' },
+  mainScoreCard: { marginHorizontal: 24, borderRadius: 20, overflow: 'hidden', marginBottom: 24 },
+  scoreCardGradient: { padding: 24, alignItems: 'center', borderRadius: 20, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
+  mainScoreLabel: { fontSize: 14, color: '#9CA3AF', marginBottom: 8 },
+  mainScoreValue: { fontSize: 64, fontWeight: 'bold' },
+  scoreBar: { width: '100%', height: 8, backgroundColor: '#1E3A5F', borderRadius: 4, marginTop: 16, overflow: 'hidden' },
+  scoreBarFill: { height: '100%', borderRadius: 4 },
+  circlesContainer: { flexDirection: 'row', justifyContent: 'space-around', paddingHorizontal: 16, marginBottom: 32 },
+  circleContainer: { alignItems: 'center' },
+  circleContent: { position: 'absolute', alignItems: 'center', justifyContent: 'center' },
+  circleValue: { fontSize: 18, fontWeight: 'bold', color: '#FFFFFF' },
+  circleUnit: { fontSize: 10, color: '#9CA3AF', marginTop: -2 },
+  circleLabel: { fontSize: 12, color: '#6B7280', marginTop: 8, textAlign: 'center' },
+  achievementsSection: { paddingHorizontal: 24, marginBottom: 32 },
+  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
+  sectionTitle: { fontSize: 20, fontWeight: 'bold', color: '#FFFFFF' },
+  achievementCount: { fontSize: 14, color: '#00AAFF', fontWeight: '600' },
+  achievementBadge: { marginBottom: 12, borderRadius: 16, overflow: 'hidden' },
+  achievementGradient: { flexDirection: 'row', alignItems: 'center', padding: 16, borderRadius: 16, borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)' },
+  achievementIcon: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', marginRight: 12 },
+  achievementInfo: { flex: 1 },
+  achievementTitle: { fontSize: 16, fontWeight: '600', marginBottom: 2 },
+  achievementDesc: { fontSize: 12, color: '#6B7280' },
+  achievementProgress: { flexDirection: 'row', alignItems: 'center', marginTop: 8, gap: 8 },
+  achievementProgressBg: { flex: 1, height: 4, backgroundColor: '#1E3A5F', borderRadius: 2, overflow: 'hidden' },
+  achievementProgressFill: { height: '100%', borderRadius: 2 },
+  achievementProgressText: { fontSize: 10, color: '#6B7280' },
+  unlockedBadge: { marginLeft: 8 },
+  settingsSection: { paddingHorizontal: 24, marginBottom: 32 },
+  settingItem: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: 'rgba(15, 31, 56, 0.8)', padding: 16, borderRadius: 16, marginTop: 12, borderWidth: 1, borderColor: '#1E3A5F' },
+  settingLeft: { flexDirection: 'row', alignItems: 'center' },
+  settingIcon: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', marginRight: 12 },
+  settingText: { fontSize: 16, color: '#FFFFFF' },
+  tipsSection: { paddingHorizontal: 24, marginBottom: 32 },
+  tipCard: { flexDirection: 'row', borderRadius: 16, padding: 16, marginTop: 12, borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)' },
+  tipIconContainer: { width: 48, height: 48, borderRadius: 24, backgroundColor: 'rgba(255,255,255,0.05)', alignItems: 'center', justifyContent: 'center', marginRight: 12 },
+  tipContent: { flex: 1 },
+  tipTitle: { fontSize: 16, fontWeight: '600', color: '#FFFFFF', marginBottom: 4 },
+  tipText: { fontSize: 14, color: '#9CA3AF', lineHeight: 20 },
+  appInfo: { alignItems: 'center', paddingTop: 16, paddingBottom: 32 },
+  appName: { fontSize: 24, fontWeight: 'bold', color: '#00AAFF' },
+  appVersion: { fontSize: 14, color: '#6B7280', marginTop: 4 },
+  deviceId: { fontSize: 10, color: '#4B5563', marginTop: 8 },
 });
-
