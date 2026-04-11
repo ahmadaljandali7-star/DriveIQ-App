@@ -1,25 +1,17 @@
 {
   "cli": {
-    "version": ">= 16.32.0"
+    "version": ">= 12.0.0"
   },
   "build": {
     "development": {
       "developmentClient": true,
-      "distribution": "internal",
-      "android": {
-        "gradleCommand": ":app:assembleDebug",
-        "buildType": "apk"
-      }
+      "distribution": "internal"
     },
     "preview": {
       "android": {
-        "gradleCommand": ":app:assembleRelease",
         "buildType": "apk"
       },
-      "distribution": "internal",
-      "env": {
-        "EXPO_NO_CAPABILITY_SYNC": "1"
-      }
+      "distribution": "internal"
     },
     "production": {
       "android": {
