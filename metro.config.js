@@ -11,6 +11,11 @@ config.cacheStores = [
   new FileStore({ root: path.join(root, 'cache') }),
 ];
 
+// Add buffer polyfill
+config.resolver.extraNodeModules = {
+  ...config.resolver.extraNodeModules,
+  buffer: require.resolve('buffer'),
+};
 
 // // Exclude unnecessary directories from file watching
 // config.watchFolders = [__dirname];
