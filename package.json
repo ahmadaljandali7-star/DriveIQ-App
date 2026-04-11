@@ -16,11 +16,7 @@
     "expo": "~52.0.23",
     "expo-blur": "~14.0.1",
     "expo-constants": "~17.0.3",
-<<<<<<< HEAD
-    "expo-font": "^55.0.6",
-=======
     "expo-font": "~13.0.4",
->>>>>>> c628c470f558b3786cd34de89d88e222465cd359
     "expo-haptics": "~14.0.0",
     "expo-linear-gradient": "~14.0.1",
     "expo-linking": "~7.0.3",
@@ -42,8 +38,7 @@
   "devDependencies": {
     "@babel/core": "^7.25.2",
     "@types/react": "~18.3.12",
-    "@types/react-native": "^0.72.8",
-    "typescript": "^5.9.3"
+    "typescript": "^5.3.3"
   },
   "private": true
 }
