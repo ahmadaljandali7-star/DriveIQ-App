@@ -24,7 +24,6 @@
       "foregroundImage": "./assets/images/adaptive-icon.png",
       "backgroundColor": "#0A1628"
     },
-    "edgeToEdgeEnabled": true,
     "permissions": [
       "ACCESS_COARSE_LOCATION",
       "ACCESS_FINE_LOCATION",
@@ -59,6 +58,7 @@
       }
     ],
     "expo-task-manager"
+<<<<<<< HEAD
   ],
   "extra": {
     "router": {
@@ -68,4 +68,7 @@
       "projectId": "687eee16-858b-4194-90d0-eae3a8b3a8ac"
     }
   }
+=======
+  ]
+>>>>>>> c628c470f558b3786cd34de89d88e222465cd359
 }

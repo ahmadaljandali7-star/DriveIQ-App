@@ -1,10 +1,8 @@
-// metro.config.js
-const { getDefaultConfig } = require("expo/metro-config");
-const path = require('path');
-const { FileStore } = require('metro-cache');
+const { getDefaultConfig } = require('expo/metro-config');
 
 const config = getDefaultConfig(__dirname);
 
+<<<<<<< HEAD
 // Use a stable on-disk store (shared across web/android)
 const root = process.env.METRO_CACHE_ROOT || path.join(__dirname, '.metro-cache');
 config.cacheStores = [
@@ -27,4 +25,6 @@ config.resolver.extraNodeModules = {
 // Reduce the number of workers to decrease resource usage
 config.maxWorkers = 2;
 
+=======
+>>>>>>> c628c470f558b3786cd34de89d88e222465cd359
 module.exports = config;

@@ -1,4 +1,3 @@
-typescript
 // ============================================
 // Location Task Helper Module
 // The actual task is defined in /index.js (entry point)

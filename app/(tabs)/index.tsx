@@ -1,4 +1,4 @@
-typescript
+3. ملف app/(tabs)/index.tsx
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
@@ -78,7 +78,6 @@ const SpeedGauge = ({ speed, maxSpeed = 200 }: { speed: number; maxSpeed?: numbe
             <Stop offset="100%" stopColor="#EF4444" />
           </SvgGradient>
         </Defs>
-        {/* Background arc */}
         <Circle
           cx={size / 2}
           cy={size / 2}
@@ -91,7 +90,6 @@ const SpeedGauge = ({ speed, maxSpeed = 200 }: { speed: number; maxSpeed?: numbe
           rotation={135}
           origin={`${size / 2}, ${size / 2}`}
         />
-        {/* Progress arc */}
         <Circle
           cx={size / 2}
           cy={size / 2}
@@ -115,18 +113,21 @@ const SpeedGauge = ({ speed, maxSpeed = 200 }: { speed: number; maxSpeed?: numbe
 };
 
 // Confetti particle component
-const ConfettiParticle = ({ delay }: { delay: number }) => {
+const ConfettiParticle = ({ index }: { index: number }) => {
   const translateY = useSharedValue(-50);
   const translateX = useSharedValue(0);
   const opacity = useSharedValue(1);
   const rotate = useSharedValue(0);
   
   useEffect(() => {
+    const delay = index * 50;
     const randomX = (Math.random() - 0.5) * SCREEN_WIDTH;
-    translateY.value = withTiming(400, { duration: 2000 + delay });
-    translateX.value = withTiming(randomX, { duration: 2000 + delay });
-    rotate.value = withTiming(360 * 3, { duration: 2000 + delay });
-    opacity.value = withTiming(0, { duration: 2000 + delay });
+    setTimeout(() => {
+      translateY.value = withTiming(400, { duration: 2000 });
+      translateX.value = withTiming(randomX, { duration: 2000 });
+      rotate.value = withTiming(360 * 3, { duration: 2000 });
+      opacity.value = withTiming(0, { duration: 2000 });
+    }, delay);
   }, []);
   
   const animatedStyle = useAnimatedStyle(() => ({
@@ -199,7 +200,6 @@ export default function TodayScreen() {
 
   // Initialize animations on mount
   useEffect(() => {
-    // Entrance animation for cards
     cardOpacity.value = withTiming(1, { duration: 600 });
     cardTranslateY.value = withSpring(0, { damping: 15 });
     
@@ -337,10 +337,8 @@ export default function TodayScreen() {
   const startTracking = async () => {
     log('Tracking', '========== START TRACKING ==========');
     
-    // Haptic feedback
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
-    // Button press animation
     buttonScale.value = withSequence(
       withTiming(0.95, { duration: 100 }),
       withTiming(1, { duration: 100 })
@@ -394,7 +392,6 @@ export default function TodayScreen() {
       setCurrentTrip(tripData);
       tripDataRef.current = tripData;
 
-      // Stop any existing background task
       try {
         const isRunning = await TaskManager.isTaskRegisteredAsync(LOCATION_TASK_NAME);
         if (isRunning) {
@@ -405,7 +402,6 @@ export default function TodayScreen() {
         // Ignore
       }
 
-      // Start background location tracking
       if (Platform.OS === 'android') {
         try {
           log('Tracking', 'Starting background location with foreground service...');
@@ -430,7 +426,6 @@ export default function TodayScreen() {
         }
       }
 
-      // Start foreground watcher
       log('Tracking', 'Starting foreground location watcher...');
       locationSubscription.current = await Location.watchPositionAsync(
         {
@@ -446,7 +441,6 @@ export default function TodayScreen() {
       log('Tracking', '✅ Foreground watcher started');
       setIsTracking(true);
 
-      // Success feedback
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
       Alert.alert(
@@ -483,7 +477,6 @@ export default function TodayScreen() {
 
     setCurrentSpeed(speed);
 
-    // Calculate distance
     if (previousLocation.current) {
       const dist = calculateDistance(
         previousLocation.current.coords.latitude,
@@ -501,7 +494,6 @@ export default function TodayScreen() {
 
     tripData.speedReadings.push(speed);
 
-    // Detect hard braking
     const speedDiff = previousSpeed.current - speed;
     if (speedDiff > 15 && previousSpeed.current > 20) {
       tripData.hardBrakes++;
@@ -509,13 +501,11 @@ export default function TodayScreen() {
       showToast('⚠️ فرملة مفاجئة!');
     }
 
-    // Detect hard acceleration
     const speedIncrease = speed - previousSpeed.current;
     if (speedIncrease > 15) {
       tripData.hardAccelerations++;
     }
 
-    // Detect speeding
     if (speed > 130 && previousSpeed.current <= 130) {
       tripData.speedingCount++;
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
@@ -530,7 +520,6 @@ export default function TodayScreen() {
   const stopTracking = async () => {
     log('Tracking', '========== STOP TRACKING ==========');
 
-    // Button animation and haptic
     buttonScale.value = withSequence(
       withTiming(0.95, { duration: 100 }),
       withTiming(1, { duration: 100 })
@@ -568,7 +557,6 @@ export default function TodayScreen() {
         ? tripData.speedReadings.reduce((a, b) => a + b, 0) / tripData.speedReadings.length
         : 0;
 
-      // Calculate score
       let score = 100;
       score -= tripData.hardBrakes * 4;
       score -= tripData.hardAccelerations * 4;
@@ -584,14 +572,12 @@ export default function TodayScreen() {
 
       await saveOfflineTrip(tripData, score, durationMinutes, avgSpeed);
 
-      // Show confetti for perfect score
       if (score === 100) {
         setShowConfetti(true);
         await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         setTimeout(() => setShowConfetti(false), 3000);
       }
 
-      // Cinematic reveal of score
       let feedbackTitle = '';
       let feedbackMessage = '';
 
@@ -611,7 +597,6 @@ export default function TodayScreen() {
 
       Alert.alert(feedbackTitle, feedbackMessage, [{ text: 'حسناً' }]);
 
-      // Reset state
       setCurrentTrip(null);
       tripDataRef.current = null;
       setCurrentSpeed(0);
@@ -681,16 +666,14 @@ export default function TodayScreen() {
       style={styles.container}
     >
       <SafeAreaView style={styles.container} edges={['top']}>
-        {/* Confetti Effect */}
         {showConfetti && (
           <View style={styles.confettiContainer}>
             {[...Array(30)].map((_, i) => (
-              <ConfettiParticle key={i} delay={i * 50} />
+              <ConfettiParticle key={i} index={i} />
             ))}
           </View>
         )}
 
-        {/* Header */}
         <View style={styles.header}>
           <Text style={styles.headerTitle}>DriveIQ</Text>
           <Text style={styles.headerSubtitle}>تحليل القيادة الذكي</Text>
@@ -701,7 +684,6 @@ export default function TodayScreen() {
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.scrollContent}
         >
-          {/* Today's Score Card - Glassmorphism */}
           <Animated.View style={[styles.scoreCard, cardAnimatedStyle]}>
             <LinearGradient
               colors={['rgba(255,255,255,0.1)', 'rgba(255,255,255,0.05)']}
@@ -717,7 +699,6 @@ export default function TodayScreen() {
             </LinearGradient>
           </Animated.View>
 
-          {/* Speed Gauge */}
           <Animated.View style={[styles.speedCard, pulseAnimatedStyle]}>
             <SpeedGauge speed={currentSpeed} />
             <Text style={styles.speedLabel}>
@@ -725,7 +706,6 @@ export default function TodayScreen() {
             </Text>
           </Animated.View>
 
-          {/* Trip Stats */}
           {isTracking && currentTrip && (
             <Animated.View style={[styles.tripStats, cardAnimatedStyle]}>
               <View style={styles.statItem}>
@@ -750,7 +730,6 @@ export default function TodayScreen() {
             </Animated.View>
           )}
 
-          {/* Status Indicator */}
           <View style={styles.statusContainer}>
             <Animated.View 
               style={[
@@ -765,7 +744,6 @@ export default function TodayScreen() {
           </View>
         </ScrollView>
 
-        {/* Control Buttons */}
         <View style={styles.buttonContainer}>
           {!isTracking ? (
             <AnimatedTouchable
@@ -821,171 +799,36 @@ export default function TodayScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  confettiContainer: {
-    ...StyleSheet.absoluteFillObject,
-    alignItems: 'center',
-    zIndex: 100,
-  },
-  header: {
-    paddingHorizontal: 24,
-    paddingTop: 16,
-    paddingBottom: 8,
-    alignItems: 'flex-start',
-  },
-  headerTitle: {
-    fontSize: 36,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
-    letterSpacing: 1,
-  },
-  headerSubtitle: {
-    fontSize: 14,
-    color: '#6B7280',
-    marginTop: 4,
-  },
-  content: {
-    flex: 1,
-    paddingHorizontal: 24,
-  },
-  scrollContent: {
-    paddingTop: 16,
-    paddingBottom: 100,
-  },
-  scoreCard: {
-    marginBottom: 20,
-    borderRadius: 24,
-    overflow: 'hidden',
-  },
-  glassCard: {
-    padding: 24,
-    alignItems: 'center',
-    borderRadius: 24,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
-  },
-  scoreLabel: {
-    fontSize: 16,
-    color: '#9CA3AF',
-    marginBottom: 8,
-  },
-  scoreValue: {
-    fontSize: 72,
-    fontWeight: 'bold',
-  },
-  scoreSubtext: {
-    fontSize: 12,
-    color: '#6B7280',
-    marginTop: 8,
-  },
-  speedCard: {
-    backgroundColor: 'rgba(15, 31, 56, 0.8)',
-    borderRadius: 24,
-    padding: 24,
-    alignItems: 'center',
-    marginBottom: 20,
-    borderWidth: 1,
-    borderColor: '#1E3A5F',
-  },
-  gaugeContainer: {
-    position: 'relative',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  gaugeTextContainer: {
-    position: 'absolute',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  gaugeSpeed: {
-    fontSize: 48,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
-  },
-  gaugeUnit: {
-    fontSize: 16,
-    color: '#9CA3AF',
-    marginTop: -4,
-  },
-  speedLabel: {
-    fontSize: 14,
-    color: '#6B7280',
-    marginTop: 12,
-  },
-  tripStats: {
-    flexDirection: 'row',
-    backgroundColor: 'rgba(15, 31, 56, 0.8)',
-    borderRadius: 20,
-    padding: 20,
-    marginBottom: 20,
-    borderWidth: 1,
-    borderColor: '#1E3A5F',
-    justifyContent: 'space-around',
-    alignItems: 'center',
-  },
-  statItem: {
-    alignItems: 'center',
-    flex: 1,
-  },
-  statValue: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
-    marginTop: 8,
-  },
-  statLabel: {
-    fontSize: 12,
-    color: '#6B7280',
-    marginTop: 4,
-  },
-  statDivider: {
-    width: 1,
-    height: 50,
-    backgroundColor: '#1E3A5F',
-  },
-  statusContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 12,
-  },
-  statusIndicator: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    marginRight: 8,
-  },
-  statusText: {
-    fontSize: 14,
-    color: '#9CA3AF',
-  },
-  buttonContainer: {
-    paddingHorizontal: 24,
-    paddingBottom: Platform.OS === 'ios' ? 100 : 90,
-  },
-  button: {
-    borderRadius: 20,
-    overflow: 'hidden',
-    elevation: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-  },
-  buttonGradient: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 18,
-    gap: 12,
-  },
+  container: { flex: 1 },
+  confettiContainer: { ...StyleSheet.absoluteFillObject, alignItems: 'center', zIndex: 100 },
+  header: { paddingHorizontal: 24, paddingTop: 16, paddingBottom: 8, alignItems: 'flex-start' },
+  headerTitle: { fontSize: 36, fontWeight: 'bold', color: '#FFFFFF', letterSpacing: 1 },
+  headerSubtitle: { fontSize: 14, color: '#6B7280', marginTop: 4 },
+  content: { flex: 1, paddingHorizontal: 24 },
+  scrollContent: { paddingTop: 16, paddingBottom: 100 },
+  scoreCard: { marginBottom: 20, borderRadius: 24, overflow: 'hidden' },
+  glassCard: { padding: 24, alignItems: 'center', borderRadius: 24, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
+  scoreLabel: { fontSize: 16, color: '#9CA3AF', marginBottom: 8 },
+  scoreValue: { fontSize: 72, fontWeight: 'bold' },
+  scoreSubtext: { fontSize: 12, color: '#6B7280', marginTop: 8 },
+  speedCard: { backgroundColor: 'rgba(15, 31, 56, 0.8)', borderRadius: 24, padding: 24, alignItems: 'center', marginBottom: 20, borderWidth: 1, borderColor: '#1E3A5F' },
+  gaugeContainer: { position: 'relative', alignItems: 'center', justifyContent: 'center' },
+  gaugeTextContainer: { position: 'absolute', alignItems: 'center', justifyContent: 'center' },
+  gaugeSpeed: { fontSize: 48, fontWeight: 'bold', color: '#FFFFFF' },
+  gaugeUnit: { fontSize: 16, color: '#9CA3AF', marginTop: -4 },
+  speedLabel: { fontSize: 14, color: '#6B7280', marginTop: 12 },
+  tripStats: { flexDirection: 'row', backgroundColor: 'rgba(15, 31, 56, 0.8)', borderRadius: 20, padding: 20, marginBottom: 20, borderWidth: 1, borderColor: '#1E3A5F', justifyContent: 'space-around', alignItems: 'center' },
+  statItem: { alignItems: 'center', flex: 1 },
+  statValue: { fontSize: 24, fontWeight: 'bold', color: '#FFFFFF', marginTop: 8 },
+  statLabel: { fontSize: 12, color: '#6B7280', marginTop: 4 },
+  statDivider: { width: 1, height: 50, backgroundColor: '#1E3A5F' },
+  statusContainer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginBottom: 12 },
+  statusIndicator: { width: 12, height: 12, borderRadius: 6, marginRight: 8 },
+  statusText: { fontSize: 14, color: '#9CA3AF' },
+  buttonContainer: { paddingHorizontal: 24, paddingBottom: Platform.OS === 'ios' ? 100 : 90 },
+  button: { borderRadius: 20, overflow: 'hidden', elevation: 8, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8 },
+  buttonGradient: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 18, gap: 12 },
   startButton: {},
   stopButton: {},
-  buttonText: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#FFFFFF',
-  },
+  buttonText: { fontSize: 18, fontWeight: '700', color: '#FFFFFF' },
 });

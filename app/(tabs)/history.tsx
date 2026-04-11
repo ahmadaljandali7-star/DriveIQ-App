@@ -1,4 +1,3 @@
-typescript
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
@@ -154,7 +153,7 @@ const SwipeableTripCard = ({
                 <Text style={styles.tripTime}>{formatTime(item.start_time)}</Text>
               </View>
               <View style={[styles.scoreContainer, { backgroundColor: `${getScoreColor(item.score)}20` }]}>
-                <Ionicons name={getScoreIcon(item.score)} size={16} color={getScoreColor(item.score)} />
+                <Ionicons name={getScoreIcon(item.score) as any} size={16} color={getScoreColor(item.score)} />
                 <Text style={[styles.tripScore, { color: getScoreColor(item.score) }]}>{item.score}</Text>
               </View>
             </View>
