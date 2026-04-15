@@ -1,4 +1,3 @@
-3. ملف app/(tabs)/index.tsx
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
