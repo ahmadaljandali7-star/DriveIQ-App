@@ -14,10 +14,7 @@
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "DriveIQ needs location to track your driving",
         "NSLocationAlwaysAndWhenInUseUsageDescription": "DriveIQ needs location to track driving trips in background",
-        "UIBackgroundModes": [
-          "location",
-          "fetch"
-        ]
+        "UIBackgroundModes": ["location", "fetch"]
       }
     },
     "android": {
@@ -31,12 +28,7 @@
         "ACCESS_BACKGROUND_LOCATION",
         "FOREGROUND_SERVICE",
         "FOREGROUND_SERVICE_LOCATION",
-        "VIBRATE",
-        "android.permission.ACCESS_COARSE_LOCATION",
-        "android.permission.ACCESS_FINE_LOCATION",
-        "android.permission.ACCESS_BACKGROUND_LOCATION",
-        "android.permission.FOREGROUND_SERVICE",
-        "android.permission.FOREGROUND_SERVICE_LOCATION"
+        "VIBRATE"
       ],
       "package": "com.ahmadaljandali90.driveiq"
     },
@@ -63,9 +55,6 @@
     "extra": {
       "router": {
         "origin": false
-      },
-      "eas": {
-        "projectId": "d07aeefe-858b-419d-88dd-eae3d0b1aebc"
       }
     }
   }
