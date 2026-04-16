@@ -14,10 +14,7 @@
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "DriveIQ needs location to track your driving",
         "NSLocationAlwaysAndWhenInUseUsageDescription": "DriveIQ needs location to track driving trips in background",
-        "UIBackgroundModes": [
-          "location",
-          "fetch"
-        ]
+        "UIBackgroundModes": ["location", "fetch"]
       }
     },
     "android": {
