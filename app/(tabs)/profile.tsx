@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+"import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -85,18 +85,18 @@ const AnimatedCircle = ({
       <View style={{ width: size, height: size }}>
         <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
           <Defs>
-            <SvgGradient id={`gradient-${label}`} x1="0%" y1="0%" x2="100%" y2="100%">
-              <Stop offset="0%" stopColor={color} stopOpacity="1" />
-              <Stop offset="100%" stopColor={color} stopOpacity="0.5" />
+            <SvgGradient id={`gradient-${label}`} x1=\"0%\" y1=\"0%\" x2=\"100%\" y2=\"100%\">
+              <Stop offset=\"0%\" stopColor={color} stopOpacity=\"1\" />
+              <Stop offset=\"100%\" stopColor={color} stopOpacity=\"0.5\" />
             </SvgGradient>
           </Defs>
           <Circle
             cx={size / 2}
             cy={size / 2}
             r={radius}
-            stroke="#1E3A5F"
+            stroke=\"#1E3A5F\"
             strokeWidth={strokeWidth}
-            fill="transparent"
+            fill=\"transparent\"
           />
           <Circle
             cx={size / 2}
@@ -104,10 +104,10 @@ const AnimatedCircle = ({
             r={radius}
             stroke={`url(#gradient-${label})`}
             strokeWidth={strokeWidth}
-            fill="transparent"
+            fill=\"transparent\"
             strokeDasharray={circumference}
             strokeDashoffset={strokeDashoffset}
-            strokeLinecap="round"
+            strokeLinecap=\"round\"
             rotation={-90}
             origin={`${size / 2}, ${size / 2}`}
           />
@@ -158,8 +158,8 @@ const AchievementBadge = ({
     <Animated.View style={[styles.achievementBadge, animatedStyle]}>
       <LinearGradient
         colors={achievement.unlocked 
-          ? [`${achievement.color}30`, `${achievement.color}10`] 
-          : ['rgba(30,58,95,0.5)', 'rgba(30,58,95,0.3)']}
+          ? [`${achievement.color}30`, `${achievement.color}10`] as [string, string]
+          : ['rgba(30,58,95,0.5)', 'rgba(30,58,95,0.3)'] as [string, string]}
         style={styles.achievementGradient}
       >
         <View style={[
@@ -201,7 +201,7 @@ const AchievementBadge = ({
         </View>
         {achievement.unlocked && (
           <View style={styles.unlockedBadge}>
-            <Ionicons name="checkmark-circle" size={20} color={achievement.color} />
+            <Ionicons name=\"checkmark-circle\" size={20} color={achievement.color} />
           </View>
         )}
       </LinearGradient>
@@ -210,8 +210,8 @@ const AchievementBadge = ({
 };
 
 // Generate avatar color based on name
-const getAvatarColor = (name: string): string[] => {
-  const colors = [
+const getAvatarColor = (name: string): [string, string] => {
+  const colors: [string, string][] = [
     ['#667eea', '#764ba2'],
     ['#f093fb', '#f5576c'],
     ['#4facfe', '#00f2fe'],
@@ -424,16 +424,16 @@ export default function ProfileScreen() {
 
   if (loading) {
     return (
-      <LinearGradient colors={['#0A1628', '#0F2847', '#0A1628']} style={styles.container}>
+      <LinearGradient colors={['#0A1628', '#0F2847', '#0A1628'] as [string, string, string]} style={styles.container}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#00AAFF" />
+          <ActivityIndicator size=\"large\" color=\"#00AAFF\" />
         </View>
       </LinearGradient>
     );
   }
 
   return (
-    <LinearGradient colors={['#0A1628', '#0F2847', '#0A1628']} style={styles.container}>
+    <LinearGradient colors={['#0A1628', '#0F2847', '#0A1628'] as [string, string, string]} style={styles.container}>
       <SafeAreaView style={styles.container} edges={['top']}>
         <ScrollView
           showsVerticalScrollIndicator={false}
@@ -442,7 +442,7 @@ export default function ProfileScreen() {
             <RefreshControl
               refreshing={refreshing}
               onRefresh={onRefresh}
-              tintColor="#00AAFF"
+              tintColor=\"#00AAFF\"
               colors={['#00AAFF']}
             />
           }
@@ -459,7 +459,7 @@ export default function ProfileScreen() {
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
             >
-              <Ionicons name="person" size={50} color="#FFFFFF" />
+              <Ionicons name=\"person\" size={50} color=\"#FFFFFF\" />
             </LinearGradient>
             <Text style={styles.driverLabel}>
               {stats && stats.average_score > 0 
@@ -467,7 +467,7 @@ export default function ProfileScreen() {
                 : 'سائق جديد'}
             </Text>
             <View style={styles.levelBadge}>
-              <Ionicons name="star" size={14} color="#FFD700" />
+              <Ionicons name=\"star\" size={14} color=\"#FFD700\" />
               <Text style={styles.levelText}>
                 المستوى {Math.min(Math.floor((stats?.total_trips || 0) / 5) + 1, 20)}
               </Text>
@@ -477,7 +477,7 @@ export default function ProfileScreen() {
           {stats && stats.total_trips > 0 && (
             <Animated.View style={[styles.mainScoreCard, statsAnimatedStyle]}>
               <LinearGradient
-                colors={['rgba(255,255,255,0.1)', 'rgba(255,255,255,0.05)']}
+                colors={['rgba(255,255,255,0.1)', 'rgba(255,255,255,0.05)'] as [string, string]}
                 style={styles.scoreCardGradient}
               >
                 <Text style={styles.mainScoreLabel}>متوسط النقاط</Text>
@@ -502,21 +502,21 @@ export default function ProfileScreen() {
           <Animated.View style={[styles.circlesContainer, statsAnimatedStyle]}>
             <AnimatedCircle
               progress={(stats?.total_trips || 0) / 100}
-              color="#00AAFF"
-              label="الرحلات"
+              color=\"#00AAFF\"
+              label=\"الرحلات\"
               value={stats?.total_trips || 0}
             />
             <AnimatedCircle
               progress={Math.min((stats?.total_distance || 0) / 500, 1)}
-              color="#10B981"
-              label="المسافة"
+              color=\"#10B981\"
+              label=\"المسافة\"
               value={(stats?.total_distance || 0).toFixed(1)}
-              unit="كم"
+              unit=\"كم\"
             />
             <AnimatedCircle
               progress={(stats?.best_score || 0) / 100}
-              color="#F59E0B"
-              label="أفضل نتيجة"
+              color=\"#F59E0B\"
+              label=\"أفضل نتيجة\"
               value={stats?.best_score || '--'}
             />
           </Animated.View>
@@ -543,7 +543,7 @@ export default function ProfileScreen() {
             <View style={styles.settingItem}>
               <View style={styles.settingLeft}>
                 <View style={[styles.settingIcon, { backgroundColor: 'rgba(139, 92, 246, 0.1)' }]}>
-                  <Ionicons name="moon" size={20} color="#8B5CF6" />
+                  <Ionicons name=\"moon\" size={20} color=\"#8B5CF6\" />
                 </View>
                 <Text style={styles.settingText}>الوضع الليلي</Text>
               </View>
@@ -560,11 +560,11 @@ export default function ProfileScreen() {
             <Text style={styles.sectionTitle}>نصائح القيادة</Text>
             
             <LinearGradient
-              colors={['rgba(16, 185, 129, 0.1)', 'rgba(16, 185, 129, 0.05)']}
+              colors={['rgba(16, 185, 129, 0.1)', 'rgba(16, 185, 129, 0.05)'] as [string, string]}
               style={styles.tipCard}
             >
               <View style={styles.tipIconContainer}>
-                <Ionicons name="speedometer" size={24} color="#10B981" />
+                <Ionicons name=\"speedometer\" size={24} color=\"#10B981\" />
               </View>
               <View style={styles.tipContent}>
                 <Text style={styles.tipTitle}>حافظ على سرعة ثابتة</Text>
@@ -575,11 +575,11 @@ export default function ProfileScreen() {
             </LinearGradient>
 
             <LinearGradient
-              colors={['rgba(245, 158, 11, 0.1)', 'rgba(245, 158, 11, 0.05)']}
+              colors={['rgba(245, 158, 11, 0.1)', 'rgba(245, 158, 11, 0.05)'] as [string, string]}
               style={styles.tipCard}
             >
               <View style={styles.tipIconContainer}>
-                <Ionicons name="warning" size={24} color="#F59E0B" />
+                <Ionicons name=\"warning\" size={24} color=\"#F59E0B\" />
               </View>
               <View style={styles.tipContent}>
                 <Text style={styles.tipTitle}>التزم بحدود السرعة</Text>
@@ -656,3 +656,4 @@ const styles = StyleSheet.create({
   appVersion: { fontSize: 14, color: '#6B7280', marginTop: 4 },
   deviceId: { fontSize: 10, color: '#4B5563', marginTop: 8 },
 });
+"
