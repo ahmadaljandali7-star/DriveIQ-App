@@ -1,4 +1,4 @@
- "import React, { useState, useEffect, useCallback } from 'react';
+"import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -848,4 +848,3 @@ const styles = StyleSheet.create({
   deviceId: { fontSize: 10, color: '#4B5563', marginTop: 8 },
 });
 "
-Observation: Overwrite successful: /app/DriveIQ-App/app/(tabs)/profile.tsx
