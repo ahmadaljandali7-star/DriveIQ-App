@@ -11,8 +11,14 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const API_URL = process.env.EXPO_PUBLIC_BACKEND_URL || '';
+const TRIPS_STORAGE_KEY = 'driveiq_offline_trips';
+
+const readTrips = async (): Promise<Trip[]> => {
+  const raw = await AsyncStorage.getItem(TRIPS_STORAGE_KEY);
+  return raw ? JSON.parse(raw) : [];
+};
 
 interface Trip {
   id: string;
@@ -40,10 +46,9 @@ export default function TripDetailScreen() {
 
   const fetchTrip = async () => {
     try {
-      const response = await fetch(`${API_URL}/api/trips/${id}`);
-      if (response.ok) {
-        const data = await response.json();
-        setTrip(data);
+      const found = (await readTrips()).find((t) => t.id === id);
+      if (found) {
+        setTrip(found);
       } else {
         Alert.alert('Error', 'Trip not found');
         router.back();
@@ -67,14 +72,12 @@ export default function TripDetailScreen() {
           style: 'destructive',
           onPress: async () => {
             try {
-              const response = await fetch(`${API_URL}/api/trips/${id}`, {
-                method: 'DELETE',
-              });
-              if (response.ok) {
-                router.back();
-              } else {
-                Alert.alert('Error', 'Failed to delete trip');
-              }
+              const trips = await readTrips();
+              await AsyncStorage.setItem(
+                TRIPS_STORAGE_KEY,
+                JSON.stringify(trips.filter((t) => t.id !== id))
+              );
+              router.back();
             } catch (error) {
               console.error('Error deleting trip:', error);
               Alert.alert('Error', 'Failed to delete trip');

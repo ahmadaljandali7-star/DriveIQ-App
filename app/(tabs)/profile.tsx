@@ -1,4 +1,4 @@
-"import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -166,12 +166,9 @@ const AchievementBadge = ({
                   style={[
                     styles.achievementProgressFill,
                     {
-                      width:
-                        String(
-                          Math.round(
-                            (achievement.progress / achievement.target) * 100
-                          )
-                        ) + '%',
+                      width: `${Math.round(
+                        (achievement.progress / achievement.target) * 100
+                      )}%`,
                       backgroundColor: achievement.color,
                     },
                   ]}
@@ -186,7 +183,7 @@ const AchievementBadge = ({
         {achievement.unlocked && (
           <View style={styles.unlockedBadge}>
             <Ionicons
-              name=\"checkmark-circle\"
+              name="checkmark-circle"
               size={20}
               color={achievement.color}
             />
@@ -445,7 +442,7 @@ export default function ProfileScreen() {
     return (
       <LinearGradient colors={bgColors} style={styles.container}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size=\"large\" color=\"#00AAFF\" />
+          <ActivityIndicator size="large" color="#00AAFF" />
         </View>
       </LinearGradient>
     );
@@ -461,7 +458,7 @@ export default function ProfileScreen() {
             <RefreshControl
               refreshing={refreshing}
               onRefresh={onRefresh}
-              tintColor=\"#00AAFF\"
+              tintColor="#00AAFF"
               colors={['#00AAFF']}
             />
           }
@@ -480,7 +477,7 @@ export default function ProfileScreen() {
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
             >
-              <Ionicons name=\"person\" size={50} color=\"#FFFFFF\" />
+              <Ionicons name="person" size={50} color="#FFFFFF" />
             </LinearGradient>
             <Text style={styles.driverLabel}>
               {stats && stats.average_score > 0
@@ -488,7 +485,7 @@ export default function ProfileScreen() {
                 : 'سائق جديد'}
             </Text>
             <View style={styles.levelBadge}>
-              <Ionicons name=\"star\" size={14} color=\"#FFD700\" />
+              <Ionicons name="star" size={14} color="#FFD700" />
               <Text style={styles.levelText}>
                 {'المستوى ' +
                   String(
@@ -523,7 +520,7 @@ export default function ProfileScreen() {
                     style={[
                       styles.scoreBarFill,
                       {
-                        width: String(Math.round(stats.average_score)) + '%',
+                        width: `${Math.round(stats.average_score)}%`,
                         backgroundColor: getScoreColor(stats.average_score),
                       },
                     ]}
@@ -538,21 +535,21 @@ export default function ProfileScreen() {
           >
             <SimpleCircle
               progress={(stats?.total_trips || 0) / 100}
-              color=\"#00AAFF\"
-              label=\"الرحلات\"
+              color="#00AAFF"
+              label="الرحلات"
               value={stats?.total_trips || 0}
             />
             <SimpleCircle
               progress={Math.min((stats?.total_distance || 0) / 500, 1)}
-              color=\"#10B981\"
-              label=\"المسافة\"
+              color="#10B981"
+              label="المسافة"
               value={(stats?.total_distance || 0).toFixed(1)}
-              unit=\"كم\"
+              unit="كم"
             />
             <SimpleCircle
               progress={(stats?.best_score || 0) / 100}
-              color=\"#F59E0B\"
-              label=\"أفضل نتيجة\"
+              color="#F59E0B"
+              label="أفضل نتيجة"
               value={stats?.best_score || '--'}
             />
           </Animated.View>
@@ -584,7 +581,7 @@ export default function ProfileScreen() {
                     { backgroundColor: 'rgba(139, 92, 246, 0.1)' },
                   ]}
                 >
-                  <Ionicons name=\"moon\" size={20} color=\"#8B5CF6\" />
+                  <Ionicons name="moon" size={20} color="#8B5CF6" />
                 </View>
                 <Text style={styles.settingText}>الوضع الليلي</Text>
               </View>
@@ -602,7 +599,7 @@ export default function ProfileScreen() {
 
             <LinearGradient colors={tipGreenColors} style={styles.tipCard}>
               <View style={styles.tipIconContainer}>
-                <Ionicons name=\"speedometer\" size={24} color=\"#10B981\" />
+                <Ionicons name="speedometer" size={24} color="#10B981" />
               </View>
               <View style={styles.tipContent}>
                 <Text style={styles.tipTitle}>حافظ على سرعة ثابتة</Text>
@@ -614,7 +611,7 @@ export default function ProfileScreen() {
 
             <LinearGradient colors={tipYellowColors} style={styles.tipCard}>
               <View style={styles.tipIconContainer}>
-                <Ionicons name=\"warning\" size={24} color=\"#F59E0B\" />
+                <Ionicons name="warning" size={24} color="#F59E0B" />
               </View>
               <View style={styles.tipContent}>
                 <Text style={styles.tipTitle}>التزم بحدود السرعة</Text>
@@ -847,4 +844,4 @@ const styles = StyleSheet.create({
   appVersion: { fontSize: 14, color: '#6B7280', marginTop: 4 },
   deviceId: { fontSize: 10, color: '#4B5563', marginTop: 8 },
 });
-"
+

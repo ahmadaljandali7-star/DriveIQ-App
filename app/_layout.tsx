@@ -3,7 +3,7 @@ import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { View, StyleSheet } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { checkTaskStatus } from './locationTask';
+import { checkTaskStatus } from '../lib/locationTask';
 
 export default function RootLayout() {
   useEffect(() => {
@@ -14,7 +14,7 @@ export default function RootLayout() {
       
       if (!status.isDefined) {
         console.error('[RootLayout] WARNING: Background task not defined!');
-        console.error('[RootLayout] Make sure index.js is the entry point');
+        console.error('[RootLayout] Make sure index.js imports lib/locationTask');
       } else {
         console.log('[RootLayout] ✅ Background task verified successfully');
       }

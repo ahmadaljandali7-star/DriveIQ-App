@@ -1,62 +1,116 @@
-name: Build Android APK
+name: Build Android & iOS
+
 on:
   push:
-    branches: [ main ]
+    branches: [main, 'claude/**']
   workflow_dispatch:
 
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
 jobs:
-  build:
-    runs-on: macos-latest
-    timeout-minutes: 150
+  check:
+    name: Type check
+    runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npx tsc --noEmit
 
-      - name: Clean and install dependencies
-        run: |
-          rm -rf node_modules package-lock.json yarn.lock
-          npm install
-
-      - name: Setup Java
-        uses: actions/setup-java@v4
+  android:
+    name: Android APK
+    needs: check
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
-          java-version: '17'
-          distribution: 'temurin'
-
-      - name: Install EAS CLI and Prebuild
-        run: |
-          npm install -g eas-cli@latest
-          npx expo prebuild --clean
-
-      - name: Set Expo token
-        run: echo "EXPO_TOKEN=${{ secrets.EXPO_TOKEN }}" >> $GITHUB_ENV
-
-      - name: Check for JS errors (allow warnings)
-        run: |
-          npx expo-doctor || echo "⚠️ Dependencies need update, but continuing..."
-          npx tsc --noEmit || echo "⚠️ TypeScript errors, but continuing..."
-
-      - name: Build APK (Cloud build - faster)
-        run: |
-          eas build -p android --profile preview --non-interactive
-        continue-on-error: true
-
-      - name: Upload APK (if exists)
-        if: success() || failure()
-        uses: actions/upload-artifact@v4
+          node-version: 20
+          cache: npm
+      - uses: actions/setup-java@v4
         with:
-          name: driveiq-apk
-          path: app-release.apk
-          if-no-files-found: warn
+          distribution: temurin
+          java-version: 17
+      - uses: gradle/actions/setup-gradle@v4
+      - run: npm ci
+      - name: Generate native Android project
+        run: npx expo prebuild --platform android --no-install
+      - name: Build release APK
+        working-directory: android
+        run: ./gradlew assembleRelease --no-daemon -PreactNativeArchitectures=armeabi-v7a,arm64-v8a
+      - name: Rename APK
+        run: cp android/app/build/outputs/apk/release/app-release.apk DriveIQ.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: DriveIQ-android
+          path: DriveIQ.apk
 
-      - name: Show build logs
-        if: failure()
+  ios:
+    name: iOS IPA (unsigned)
+    needs: check
+    runs-on: macos-15
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Select Xcode 16
         run: |
-          echo "=== Build failed. Checking logs ==="
-          ls -la /Users/runner/.expo/ || true
-          cat /Users/runner/.expo/*.log 2>/dev/null || echo "No logs found"
+          XC=$(ls -d /Applications/Xcode_16*.app | sort -V | tail -1)
+          echo "Using $XC"
+          sudo xcode-select -s "$XC"
+          xcodebuild -version
+      - run: npm ci
+      - name: Generate native iOS project
+        run: npx expo prebuild --platform ios
+      - name: Build app (no code signing)
+        run: |
+          WS=$(ls -d ios/*.xcworkspace | head -1)
+          SCHEME=$(basename "$WS" .xcworkspace)
+          xcodebuild -workspace "$WS" -scheme "$SCHEME" -configuration Release \
+            -sdk iphoneos -destination 'generic/platform=iOS' \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
+            build | tail -n 200
+      - name: Package IPA
+        run: |
+          APP=$(ls -d build/Build/Products/Release-iphoneos/*.app | head -1)
+          mkdir Payload
+          cp -R "$APP" Payload/
+          zip -qry DriveIQ-unsigned.ipa Payload
+      - uses: actions/upload-artifact@v4
+        with:
+          name: DriveIQ-ios
+          path: DriveIQ-unsigned.ipa
+
+  release:
+    name: Publish release
+    needs: [android, ios]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: build-${{ github.run_number }}
+          name: DriveIQ build ${{ github.run_number }}
+          target_commitish: ${{ github.sha }}
+          prerelease: ${{ github.ref != 'refs/heads/main' }}
+          body: |
+            **Android:** download `DriveIQ.apk` on your phone and open it (allow "Install unknown apps").
+            **iPhone:** `DriveIQ-unsigned.ipa` must be signed on install with AltStore or Sideloadly (free Apple ID). See README.
+          files: |
+            DriveIQ.apk
+            DriveIQ-unsigned.ipa

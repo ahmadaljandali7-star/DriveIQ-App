@@ -30,7 +30,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import Svg, { Circle, Defs, LinearGradient as SvgGradient, Stop } from 'react-native-svg';
 
-import { LOCATION_TASK_NAME, checkTaskStatus } from '../locationTask';
+import { LOCATION_TASK_NAME, checkTaskStatus } from '../../lib/locationTask';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const WELCOME_SHOWN_KEY = 'driveiq_welcome_shown';

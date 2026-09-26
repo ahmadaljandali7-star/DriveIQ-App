@@ -1,50 +1,41 @@
-# Welcome to your Expo app 👋
+# DriveIQ 🚗
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+تطبيق لتحليل القيادة: يتتبع رحلاتك عبر GPS، يحسب السرعة والمسافة، يكتشف الفرملة المفاجئة والتسارع الحاد وتجاوز السرعة، ويعطيك نقاطاً لكل رحلة. كل البيانات محفوظة على الجهاز.
 
-## Get started
+## التثبيت
 
-1. Install dependencies
+كل دفعة (push) إلى GitHub تبني التطبيق تلقائياً عبر GitHub Actions وتنشر الملفات في صفحة **Releases** بالمستودع.
 
-   ```bash
-   npm install
-   ```
+### أندرويد
+1. افتح صفحة **Releases** من هاتفك ونزّل `DriveIQ.apk`.
+2. افتح الملف، واسمح بـ "تثبيت التطبيقات من مصادر غير معروفة" عند الطلب.
+3. عند التشغيل امنح صلاحية الموقع واختر **"السماح طوال الوقت"** ليستمر التتبع في الخلفية.
 
-2. Start the app
+### آيفون
+أبل لا تسمح بتثبيت تطبيق بدون توقيع، لذلك يوجد خياران:
 
-   ```bash
-   npx expo start
-   ```
+**أ) مجاناً (Sideloadly / AltStore):**
+1. نزّل `DriveIQ-unsigned.ipa` من صفحة **Releases** على الكمبيوتر.
+2. ثبّت [Sideloadly](https://sideloadly.io) أو [AltStore](https://altstore.io) وصِل الآيفون بالكابل.
+3. اسحب ملف الـ IPA وسجّل بحساب Apple ID الخاص بك، فيوقّعه ويثبّته.
+4. على الآيفون: الإعدادات ← عام ← VPN وإدارة الجهاز ← ثق بالمطوّر. (مع حساب مجاني يجب إعادة التوقيع كل 7 أيام.)
 
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
-
+**ب) رسمياً (حساب Apple Developer مدفوع):**
 ```bash
-npm run reset-project
+npm install -g eas-cli
+eas login
+eas build -p ios --profile preview     # للتثبيت المباشر على أجهزة مسجلة
+eas build -p ios --profile production && eas submit -p ios   # TestFlight / App Store
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+## التطوير
 
-## Learn more
+```bash
+npm install
+npx expo start          # شغّل على المحاكي أو جهاز فيه development build
+npx tsc --noEmit        # فحص الأنواع
+```
 
-To learn more about developing your project with Expo, look at the following resources:
-
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
-
-## Join the community
-
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+- الشاشات في `app/` (Expo Router).
+- مهمة تتبع الموقع في الخلفية معرفة في `lib/locationTask.ts` ويتم تحميلها من `index.js` قبل بدء التطبيق.
+- مجلدات `android/` و `ios/` تُولَّد تلقائياً بـ `npx expo prebuild` ولا تُحفظ في المستودع.
