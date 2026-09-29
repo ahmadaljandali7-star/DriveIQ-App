@@ -49,7 +49,10 @@ jobs:
       # keeps the trip history.
       - name: Build APK signed with EAS credentials
         if: env.EXPO_TOKEN != ''
-        run: npx --yes eas-cli@latest build -p android --profile preview --local --non-interactive --output DriveIQ.apk
+        run: |
+          # Secrets pasted with a trailing newline break the HTTP header.
+          export EXPO_TOKEN="$(printf '%s' "$EXPO_TOKEN" | tr -d '[:space:]')"
+          npx --yes eas-cli@latest build -p android --profile preview --local --non-interactive --output DriveIQ.apk
       - name: Build APK (debug-signed fallback)
         if: env.EXPO_TOKEN == ''
         run: |
