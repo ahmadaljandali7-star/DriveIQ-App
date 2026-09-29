@@ -1,23 +1,29 @@
 {
   "expo": {
     "name": "DriveIQ",
-    "slug": "driveiq",
-    "version": "1.0.0",
+    "slug": "driveiq-app",
+    "version": "1.1.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "driveiq",
-    "userInterfaceStyle": "automatic",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#0A1628",
     "newArchEnabled": false,
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.ahmadaljandali90.driveiq",
+      "buildNumber": "2",
       "infoPlist": {
-        "NSLocationWhenInUseUsageDescription": "DriveIQ needs location to track your driving",
-        "NSLocationAlwaysAndWhenInUseUsageDescription": "DriveIQ needs location to track driving trips in background",
-        "UIBackgroundModes": ["location", "fetch"]
+        "UIBackgroundModes": [
+          "location",
+          "fetch"
+        ],
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
+      "package": "com.ahmad_aljandali90.driveiq",
+      "versionCode": 2,
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#0A1628"
@@ -28,14 +34,14 @@
         "ACCESS_BACKGROUND_LOCATION",
         "FOREGROUND_SERVICE",
         "FOREGROUND_SERVICE_LOCATION",
-        "VIBRATE",
-        "android.permission.ACCESS_COARSE_LOCATION",
-        "android.permission.ACCESS_FINE_LOCATION",
-        "android.permission.ACCESS_BACKGROUND_LOCATION",
-        "android.permission.FOREGROUND_SERVICE",
-        "android.permission.FOREGROUND_SERVICE_LOCATION"
+        "VIBRATE"
       ],
-      "package": "com.ahmadaljandali90.driveiq"
+      "blockedPermissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.SYSTEM_ALERT_WINDOW",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE"
+      ]
     },
     "web": {
       "bundler": "metro",
@@ -44,15 +50,33 @@
     },
     "plugins": [
       "expo-router",
-      "expo-splash-screen",
+      "expo-localization",
+      "expo-system-ui",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/images/splash-icon.png",
+          "imageWidth": 180,
+          "resizeMode": "contain",
+          "backgroundColor": "#0A1628"
+        }
+      ],
       [
         "expo-location",
         {
-          "locationAlwaysAndWhenInUsePermission": "DriveIQ needs location to track your driving trips",
-          "locationAlwaysPermission": "DriveIQ uses your location to track driving even when not in use",
-          "locationWhenInUsePermission": "DriveIQ needs location to track your driving",
+          "locationAlwaysAndWhenInUsePermission": "DriveIQ uses your location in the background to detect trips automatically and score your driving. Data stays on your device.",
+          "locationAlwaysPermission": "DriveIQ uses your location in the background to detect trips automatically.",
+          "locationWhenInUsePermission": "DriveIQ uses your location to record and score your trips.",
           "isAndroidBackgroundLocationEnabled": true,
           "isAndroidForegroundServiceEnabled": true
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "DriveIQ needs access to your photos to set your profile picture.",
+          "cameraPermission": "DriveIQ needs the camera to take your profile picture.",
+          "microphonePermission": false
         }
       ],
       "expo-task-manager"
@@ -62,7 +86,7 @@
         "origin": false
       },
       "eas": {
-        "projectId": "687eee16-858b-4194-90d0-eae3a8b3a8ac"
+        "projectId": "edf52dc2-fb7e-4746-b85b-aae0eb49dd89"
       }
     }
   }

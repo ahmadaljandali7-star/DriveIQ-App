@@ -1,47 +1,61 @@
 import React, { useEffect } from 'react';
-import { Stack } from 'expo-router';
+import { StyleSheet, View } from 'react-native';
+import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { View, StyleSheet } from 'react-native';
+import * as SplashScreen from 'expo-splash-screen';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { checkTaskStatus } from '../lib/locationTask';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+
+import { AppProvider, useApp } from '../lib/AppContext';
+import Toast from '../components/Toast';
+import { colors } from '../lib/theme';
+
+SplashScreen.preventAutoHideAsync().catch(() => {});
+
+function RootNavigator() {
+  const { isLoaded, userName, toast } = useApp();
+  const segments = useSegments();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!isLoaded) return;
+    SplashScreen.hideAsync().catch(() => {});
+    const onWelcome = segments[0] === 'welcome';
+    if (!userName && !onWelcome) router.replace('/welcome');
+    else if (userName && onWelcome) router.replace('/');
+  }, [isLoaded, userName, segments]);
+
+  if (!isLoaded) return <View style={styles.container} />;
+
+  return (
+    <View style={styles.container}>
+      <StatusBar style="light" />
+      <Stack
+        screenOptions={{
+          headerShown: false,
+          contentStyle: { backgroundColor: colors.bg },
+          animation: 'slide_from_right',
+        }}
+      >
+        <Stack.Screen name="welcome" options={{ animation: 'fade' }} />
+      </Stack>
+      <Toast message={toast} />
+    </View>
+  );
+}
 
 export default function RootLayout() {
-  useEffect(() => {
-    // Verify background task is ready when app loads
-    const verifyTask = async () => {
-      console.log('[RootLayout] Verifying background task...');
-      const status = await checkTaskStatus();
-      
-      if (!status.isDefined) {
-        console.error('[RootLayout] WARNING: Background task not defined!');
-        console.error('[RootLayout] Make sure index.js imports lib/locationTask');
-      } else {
-        console.log('[RootLayout] ✅ Background task verified successfully');
-      }
-    };
-    
-    verifyTask();
-  }, []);
-  
   return (
     <GestureHandlerRootView style={styles.container}>
-      <View style={styles.container}>
-        <StatusBar style="light" />
-        <Stack
-          screenOptions={{
-            headerShown: false,
-            contentStyle: { backgroundColor: '#0A1628' },
-            animation: 'slide_from_right',
-          }}
-        />
-      </View>
+      <SafeAreaProvider>
+        <AppProvider>
+          <RootNavigator />
+        </AppProvider>
+      </SafeAreaProvider>
     </GestureHandlerRootView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#0A1628',
-  },
+  container: { flex: 1, backgroundColor: colors.bg },
 });

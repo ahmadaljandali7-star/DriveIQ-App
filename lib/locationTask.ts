@@ -1,99 +1,91 @@
 // ============================================
-// Location Task Module
-// The background task is defined here at module scope. This module is
-// imported by /index.js (the app entry point) so the task is registered
-// before the app renders, as required by expo-task-manager.
+// Background location task
+// Defined at module scope and imported from /index.js so it exists
+// before the app renders, including when the OS wakes the app in the
+// background. Every location batch goes to the trip engine.
 // ============================================
 
 import * as TaskManager from 'expo-task-manager';
 import * as Location from 'expo-location';
+import { Platform } from 'react-native';
+import { processLocations } from './tripEngine';
 
 export const LOCATION_TASK_NAME = 'driveiq-location-tracking';
 
-TaskManager.defineTask(LOCATION_TASK_NAME, async ({ data, error }) => {
-  if (error) {
-    console.error('[LocationTask] Error:', error.message);
-    return;
-  }
-  const locations = (data as { locations?: Location.LocationObject[] } | undefined)?.locations;
-  console.log('[LocationTask] Received ' + (locations ? locations.length : 0) + ' locations');
-});
+if (!TaskManager.isTaskDefined(LOCATION_TASK_NAME)) {
+  TaskManager.defineTask(LOCATION_TASK_NAME, async ({ data, error }) => {
+    if (error) {
+      console.warn('[DriveIQ][BG]', error.message);
+      return;
+    }
+    const locations = (data as { locations?: Location.LocationObject[] } | undefined)?.locations;
+    if (locations?.length) await processLocations(locations);
+  });
+}
 
-// Check if the background task is properly set up
-export async function checkTaskStatus(): Promise<{
-  isDefined: boolean;
-  isRegistered: boolean;
-}> {
+export type PermissionState = 'none' | 'foreground' | 'background';
+
+export async function getPermissionState(): Promise<PermissionState> {
+  const fg = await Location.getForegroundPermissionsAsync();
+  if (fg.status !== 'granted') return 'none';
+  const bg = await Location.getBackgroundPermissionsAsync();
+  return bg.status === 'granted' ? 'background' : 'foreground';
+}
+
+export async function requestPermissions(): Promise<PermissionState> {
+  const fg = await Location.requestForegroundPermissionsAsync();
+  if (fg.status !== 'granted') return 'none';
   try {
-    const isDefined = TaskManager.isTaskDefined(LOCATION_TASK_NAME);
-    const isRegistered = await TaskManager.isTaskRegisteredAsync(LOCATION_TASK_NAME);
-    
-    console.log(`[TaskHelper] Task "${LOCATION_TASK_NAME}" - Defined: ${isDefined}, Registered: ${isRegistered}`);
-    
-    return { isDefined, isRegistered };
-  } catch (error) {
-    console.error('[TaskHelper] Error checking task status:', error);
-    return { isDefined: false, isRegistered: false };
+    const bg = await Location.requestBackgroundPermissionsAsync();
+    return bg.status === 'granted' ? 'background' : 'foreground';
+  } catch {
+    return 'foreground';
   }
 }
 
-// Ensure task is ready before starting tracking
-export async function ensureTaskReady(): Promise<boolean> {
-  const { isDefined } = await checkTaskStatus();
-  
-  if (!isDefined) {
-    console.error('[TaskHelper] CRITICAL: Background task not defined! Check lib/locationTask.ts');
-    return false;
-  }
-  
-  return true;
+export interface ServiceOptions {
+  powerSaving: boolean;
+  notificationTitle: string;
+  notificationBody: string;
 }
 
-// Stop the background task if running
-export async function stopBackgroundTask(): Promise<void> {
+export async function isServiceRunning(): Promise<boolean> {
+  return Location.hasStartedLocationUpdatesAsync(LOCATION_TASK_NAME).catch(() => false);
+}
+
+// (Re)starts background location updates. Must be called while the app
+// is in the foreground (Android 12+ forbids starting it from background).
+export async function startService(opts: ServiceOptions): Promise<boolean> {
   try {
-    const isRegistered = await TaskManager.isTaskRegisteredAsync(LOCATION_TASK_NAME);
-    if (isRegistered) {
+    if (await isServiceRunning()) {
       await Location.stopLocationUpdatesAsync(LOCATION_TASK_NAME);
-      console.log('[TaskHelper] Background task stopped');
     }
-  } catch (error) {
-    console.error('[TaskHelper] Error stopping task:', error);
-  }
-}
-
-// Start the background location task
-export async function startBackgroundTask(): Promise<boolean> {
-  try {
-    const { isDefined } = await checkTaskStatus();
-    
-    if (!isDefined) {
-      console.error('[TaskHelper] Cannot start - task not defined');
-      return false;
-    }
-    
-    // Stop any existing task first
-    await stopBackgroundTask();
-    
-    // Start the background location updates
     await Location.startLocationUpdatesAsync(LOCATION_TASK_NAME, {
-      accuracy: Location.Accuracy.BestForNavigation,
-      timeInterval: 2000,
-      distanceInterval: 5,
-      showsBackgroundLocationIndicator: true,
-      foregroundService: {
-        notificationTitle: 'DriveIQ - تتبع القيادة',
-        notificationBody: 'جاري تسجيل رحلتك...',
-        notificationColor: '#0066CC',
-      },
+      accuracy: opts.powerSaving ? Location.Accuracy.Balanced : Location.Accuracy.BestForNavigation,
+      timeInterval: opts.powerSaving ? 8000 : 2000,
+      // 0 keeps updates coming while parked, which is what ends a trip.
+      distanceInterval: 0,
       pausesUpdatesAutomatically: false,
       activityType: Location.ActivityType.AutomotiveNavigation,
+      showsBackgroundLocationIndicator: Platform.OS === 'ios',
+      foregroundService: {
+        notificationTitle: opts.notificationTitle,
+        notificationBody: opts.notificationBody,
+        notificationColor: '#00AAFF',
+        killServiceOnDestroy: false,
+      },
     });
-    
-    console.log('[TaskHelper] Background task started successfully');
     return true;
-  } catch (error) {
-    console.error('[TaskHelper] Error starting task:', error);
+  } catch (e: any) {
+    console.warn('[DriveIQ] startService failed:', e?.message);
     return false;
+  }
+}
+
+export async function stopService(): Promise<void> {
+  try {
+    if (await isServiceRunning()) await Location.stopLocationUpdatesAsync(LOCATION_TASK_NAME);
+  } catch (e: any) {
+    console.warn('[DriveIQ] stopService failed:', e?.message);
   }
 }
