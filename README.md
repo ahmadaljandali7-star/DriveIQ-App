@@ -1,50 +1,45 @@
-# Welcome to your Expo app 👋
+# DriveIQ 🚗
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+تطبيق احترافي لتحليل القيادة. **يكتشف الرحلات تلقائياً** (تبدأ فوق 15 كم/س وتنتهي بعد 3 دقائق من التوقف)، ويحسب المسافة والسرعة، ويكتشف الفرملة والتسارع المفاجئ وتجاوز السرعة، ويعطي كل رحلة نقاطاً من 100. كل البيانات محفوظة على الجهاز فقط.
 
-## Get started
+## الميزات
+- اكتشاف تلقائي للرحلات في الخلفية، مع زر يدوي لبدء وإنهاء الرحلة.
+- عدّاد سرعة حيّ، مع مدة الرحلة ومسافتها وأحداثها أثناء القيادة.
+- السجل مجمّع حسب الأيام، مع ملخص آخر 7 أيام وتفاصيل كل رحلة (فتح المسار على الخريطة، والمشاركة).
+- 6 إنجازات، وإحصائيات كاملة، وصورة شخصية من الكاميرا أو المعرض.
+- 4 لغات: العربية، English، Deutsch، Français.
+- وضع توفير البطارية، وإمكانية إيقاف الاكتشاف التلقائي.
+- متوافق مع سجل الرحلات من النسخة السابقة: لا يُمسح أي شيء، ويُحفظ نسخة احتياطية تلقائياً (`trips_backup_v1`).
 
-1. Install dependencies
+## التثبيت
+كل push إلى GitHub يبني التطبيق وينشره في صفحة **Releases**.
 
-   ```bash
-   npm install
-   ```
+### أندرويد
+نزّل `DriveIQ.apk` من الهاتف وثبّته، ثم اسمح بالموقع **"طوال الوقت"**.
 
-2. Start the app
+لكي يُثبَّت التحديث **فوق** التطبيق المثبّت من expo.dev ويبقى السجل، يجب أن يُوقَّع بنفس المفتاح:
+1. على expo.dev: **Account settings ← Access tokens ← Create token**.
+2. في مستودع GitHub: **Settings ← Secrets and variables ← Actions ← New repository secret**، الاسم `EXPO_TOKEN` والقيمة هي الـ token.
 
-   ```bash
-   npx expo start
-   ```
+بدون هذا السر يُبنى APK موقّع بمفتاح تجريبي، ولا يمكن تثبيته فوق نسخة expo.dev.
 
-In the output, you'll find options to open the app in a
+### آيفون
+الآيفون لا يفتح ملف `.ipa` مباشرة. نزّل `DriveIQ-unsigned.ipa` على الكمبيوتر، وثبّته عبر [Sideloadly](https://sideloadly.io) بحساب Apple ID، ثم:
+- **الإعدادات ← الخصوصية والأمن ← وضع المطور**: فعّله.
+- **الإعدادات ← عام ← VPN وإدارة الجهاز**: اضغط "ثق".
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+مع حساب Apple المجاني يجب إعادة التثبيت كل 7 أيام. للتثبيت الدائم عبر TestFlight يلزم حساب Apple Developer.
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
+## البنية
+- `lib/tripEngine.ts`: منطق الرحلة (بدء وإنهاء تلقائي، وكشف الأحداث، والنقاط). يعمل داخل مهمة الخلفية ويحفظ حالته بعد كل دفعة مواقع.
+- `lib/locationTask.ts`: مهمة الموقع في الخلفية وخدمة التتبع، وتُحمَّل من `index.js`.
+- `lib/storage.ts`: التخزين المتوافق مع النسخة السابقة.
+- `lib/AppContext.tsx`: حالة التطبيق والإعدادات.
+- `lib/i18n.ts`: الترجمات.
+- `app/`: الشاشات (Expo Router).
 
 ```bash
-npm run reset-project
+npm install
+npx expo start
+npx tsc --noEmit
 ```
-
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
-
-## Learn more
-
-To learn more about developing your project with Expo, look at the following resources:
-
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
-
-## Join the community
-
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
